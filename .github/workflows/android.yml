@@ -1,0 +1,58 @@
+name: Android app
+
+on:
+  push:
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The build machine already has the Android SDK; this accepts its licences and adds the two packages the app needs.
+      - name: Android SDK packages
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      # Signed with your own upload key when these repository secrets exist; otherwise signed with the debug key so you can still install and test it.
+      - name: Prepare signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.LS_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ls-release.jks"
+            echo "LS_KEYSTORE=$RUNNER_TEMP/ls-release.jks" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build release APK and Play Store bundle
+        env:
+          LS_KEYSTORE_PASSWORD: ${{ secrets.LS_KEYSTORE_PASSWORD }}
+          LS_KEY_ALIAS: ${{ secrets.LS_KEY_ALIAS }}
+          LS_KEY_PASSWORD: ${{ secrets.LS_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease bundleRelease
+
+      - name: Show checksum
+        run: sha256sum app/build/outputs/apk/release/*.apk app/build/outputs/bundle/release/*.aab
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: landlordspaces-android
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
