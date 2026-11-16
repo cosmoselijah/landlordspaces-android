@@ -60,7 +60,18 @@ jobs:
           LS_KEYSTORE_PASSWORD: ${{ secrets.LS_KEYSTORE_PASSWORD }}
           LS_KEY_ALIAS: ${{ secrets.LS_KEY_ALIAS }}
           LS_KEY_PASSWORD: ${{ secrets.LS_KEY_PASSWORD }}
-        run: gradle --no-daemon assembleRelease bundleRelease
+        run: |
+          set -o pipefail
+          gradle --no-daemon assembleRelease bundleRelease 2>&1 | tee "$RUNNER_TEMP/build.log" || {
+            {
+              echo "## Build errors (copy these to Claude)"
+              echo '```'
+              grep -E '^e: |^w: .*error|What went wrong|Execution failed|Unresolved|Could not' -A1 "$RUNNER_TEMP/build.log" | head -120
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            grep -E '^e: ' "$RUNNER_TEMP/build.log" | head -20 | while read -r line; do echo "::error::$line"; done
+            exit 1
+          }
 
       - name: Show checksum
         run: sha256sum app/build/outputs/apk/release/*.apk app/build/outputs/bundle/release/*.aab
