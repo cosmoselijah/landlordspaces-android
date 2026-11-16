@@ -38,3 +38,5 @@ Upload the APK to the website admin (Android releases) so members see the update
 ## Not in this first version
 
 Push notifications (needs a Firebase `google-services.json`), and Play Store listing material (#110).
+
+Build trigger.
