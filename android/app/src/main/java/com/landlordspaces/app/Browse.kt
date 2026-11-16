@@ -70,10 +70,30 @@ fun BrowseScreen(repo: Repo, startMarket: String, startCat: String, startQuery: 
     var error by remember { mutableStateOf("") }
     var sortMenu by remember { mutableStateOf(false) }
     var filters by remember { mutableStateOf(false) }
+    var near by remember { mutableStateOf("") }
+    var nearNote by remember { mutableStateOf("") }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    fun locate() {
+        val lm = ctx.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager
+        var best: android.location.Location? = null
+        try {
+            for (p in lm.getProviders(true)) {
+                val l = lm.getLastKnownLocation(p) ?: continue
+                if (best == null || l.time > best!!.time) best = l
+            }
+        } catch (e: SecurityException) { }
+        val b = best
+        if (b == null) { nearNote = "Turn on location on your phone, then try again." }
+        else { nearNote = ""; near = b.latitude.toString() + "," + b.longitude.toString() }
+    }
+    val askLocation = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()) { g ->
+        if (g.values.any { it }) locate() else nearNote = "Location permission is needed to show properties near you."
+    }
     val list = rememberLazyListState()
 
     fun extra(): String {
         val b = StringBuilder()
+        if (near.isNotEmpty()) b.append("&near=").append(near)
         if (beds > 0) b.append("&bedrooms=").append(beds)
         if (minPrice.isNotBlank()) b.append("&min_price=").append(minPrice.filter { it.isDigit() })
         if (maxPrice.isNotBlank()) b.append("&max_price=").append(maxPrice.filter { it.isDigit() })
@@ -92,7 +112,7 @@ fun BrowseScreen(repo: Repo, startMarket: String, startCat: String, startQuery: 
             loading = false; more = false
         }
     }
-    LaunchedEffect(segment, sort, city, startMarket, startCat, startQuery) { fetch(1) }
+    LaunchedEffect(segment, sort, city, near, startMarket, startCat, startQuery) { fetch(1) }
     LaunchedEffect(Unit) { online { repo.meta() }.onSuccess { cities = it.first } }
     LaunchedEffect(list, results.size, hasMore) {
         snapshotFlow { list.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }.collect { last ->
@@ -130,12 +150,21 @@ fun BrowseScreen(repo: Repo, startMarket: String, startCat: String, startQuery: 
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Pill("Filters", city.isNotEmpty() || beds > 0 || minPrice.isNotBlank() || maxPrice.isNotBlank(), { filters = true })
+            Pill("Near me", near.isNotEmpty(), {
+                if (near.isNotEmpty()) { near = "" }
+                else {
+                    val ok = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+                        androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (ok) locate() else askLocation.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+                }
+            })
             Pill("Map", false, { openWeb("Map", "/search?view=map") })
             Box {
                 Pill("Sort", false, { sortMenu = true })
                 DropdownMenu(sortMenu, { sortMenu = false }) { SORTS.forEach { s -> DropdownMenuItem({ Text(s.second, fontWeight = if (sort == s.first) FontWeight.Bold else FontWeight.Normal) }, { sort = s.first; sortMenu = false }) } }
             }
         }
+        if (nearNote.isNotEmpty()) Text(nearNote, color = Brand.Danger, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 20.dp))
         Text(if (loading) "Searching…" else "${java.text.NumberFormat.getIntegerInstance().format(total)} properties found", color = Brand.Muted, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp))
         Loadable(loading && results.isEmpty(), error, { fetch(1) }) {
             if (results.isEmpty()) EmptyState("No properties found", "Try a different search or clear your filters.")

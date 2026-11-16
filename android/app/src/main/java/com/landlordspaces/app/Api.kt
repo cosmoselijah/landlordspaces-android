@@ -56,6 +56,11 @@ object Api {
 class Session(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("ls_session", Context.MODE_PRIVATE)
 
+    private val cacheStore = context.applicationContext.getSharedPreferences("ls_cache", Context.MODE_PRIVATE)
+    fun cachePut(k: String, v: String) { try { cacheStore.edit().putString(k, v).apply() } catch (e: Exception) { } }
+    fun cacheGet(k: String): String? = cacheStore.getString(k, null)
+    fun cacheClear() { cacheStore.edit().clear().apply() }
+
     var access: String?
         get() = prefs.getString("access", null)
         set(v) { prefs.edit().putString("access", v).apply() }
@@ -94,6 +99,7 @@ class Session(context: Context) {
 
     fun clear() {
         prefs.edit().remove("access").remove("refresh").remove("name").apply()
+        cacheClear()
     }
 
     /** Call a signed-in endpoint; if the access token has expired, renew it once and retry. */

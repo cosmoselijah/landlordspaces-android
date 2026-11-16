@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Landscape
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -64,7 +65,7 @@ private fun CategoryTile(icon: ImageVector, label: String, onClick: () -> Unit, 
 @Composable
 fun HomeScreen(
     repo: Repo, openListing: (Int) -> Unit, openBrowse: (market: String, cat: String, query: String) -> Unit, openWeb: (String, String) -> Unit,
-    openNotifications: () -> Unit, openWorkspace: () -> Unit, openSaved: () -> Unit,
+    openNotifications: () -> Unit, openWorkspace: () -> Unit, openSaved: () -> Unit, openAi: () -> Unit,
 ) {
     StatusBar(darkBackground = true)
     val context = LocalContext.current
@@ -115,6 +116,7 @@ fun HomeScreen(
                     IconButton(openWorkspace) { Icon(Icons.Filled.Menu, "Workspace", tint = Color.White) }
                     LogoMark(30)
                     Text("LandlordSpaces", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                    IconButton(openAi) { Icon(Icons.Outlined.AutoAwesome, "Ask AI", tint = Color.White) }
                     Box {
                         IconButton(openNotifications) { Icon(Icons.Outlined.Notifications, "Notifications", tint = Color.White) }
                         if (unread > 0) Box(Modifier.padding(top = 8.dp, end = 8.dp).size(10.dp).clip(CircleShape).background(Brand.Danger).align(Alignment.TopEnd))

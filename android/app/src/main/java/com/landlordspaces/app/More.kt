@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Payments
@@ -239,7 +240,7 @@ private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit, badge
 
 @Composable
 fun AccountScreen(
-    repo: Repo, openWeb: (String, String) -> Unit, openSaved: () -> Unit, openNotifications: () -> Unit, openWorkspace: () -> Unit, onSignedOut: () -> Unit,
+    repo: Repo, openWeb: (String, String) -> Unit, openSaved: () -> Unit, openNotifications: () -> Unit, openWorkspace: () -> Unit, openAi: () -> Unit, onSignedOut: () -> Unit,
 ) {
     StatusBar(darkBackground = false)
     val context = LocalContext.current
@@ -271,7 +272,8 @@ fun AccountScreen(
         MenuRow(Icons.Outlined.Groups, "Tenant Management", { openWeb("Tenant Management", "/tenant-management") })
         MenuRow(Icons.Outlined.Savings, "Rent Savings", { openWeb("Rent Savings", "/account/rent-savings") })
         MenuRow(Icons.Outlined.Notifications, "Notifications", openNotifications, badge = unread)
-        MenuRow(Icons.Outlined.Security, "Security & Privacy", { openWeb("Security & Privacy", "/account/profile") })
+        MenuRow(Icons.Outlined.Security, "Security & Privacy", { openWeb("Security & Privacy", "/account/security") })
+        MenuRow(Icons.Outlined.AutoAwesome, "Ask AI", openAi)
         MenuRow(Icons.Outlined.Info, "Help & Support", { openWeb("Help & Support", "/help") })
         MenuRow(Icons.AutoMirrored.Filled.ExitToApp, "Sign Out", { confirm = true }, danger = true)
         Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

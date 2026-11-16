@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.outlined.Bathtub
 import androidx.compose.material.icons.outlined.Bed
+import androidx.compose.material.icons.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.LocationOn
@@ -88,7 +89,11 @@ private fun Row2(label: String, value: String) {
 }
 
 @Composable
-fun DetailScreen(repo: Repo, id: Int, onBack: () -> Unit, openListing: (Int) -> Unit, openChat: (Int) -> Unit, openWeb: (String, String) -> Unit) {
+fun DetailScreen(
+    repo: Repo, key: String, onBack: () -> Unit, openListing: (Int) -> Unit, openChat: (Int) -> Unit, openWeb: (String, String) -> Unit,
+    inCompare: Boolean = false, onCompare: (Listing) -> Unit = {},
+) {
+    val id = key
     StatusBar(darkBackground = true)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -105,7 +110,7 @@ fun DetailScreen(repo: Repo, id: Int, onBack: () -> Unit, openListing: (Int) -> 
     fun load() {
         scope.launch {
             loading = true; error = ""
-            online { repo.detail(id) }.onSuccess { d = it; saved = it.base.saved }.onFailure { error = friendly(it) }
+            online { repo.detail(key) }.onSuccess { d = it; saved = it.base.saved }.onFailure { error = friendly(it) }
             loading = false
         }
     }
@@ -131,9 +136,10 @@ fun DetailScreen(repo: Repo, id: Int, onBack: () -> Unit, openListing: (Int) -> 
                                     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, x.base.title + " - " + SITE + x.url)
                                     context.startActivity(Intent.createChooser(send, "Share property"))
                                 }) { Icon(Icons.Outlined.Share, "Share", Modifier.size(20.dp), tint = Brand.Ink) }
+                                CircleAction({ onCompare(x.base) }) { Icon(Icons.Outlined.CompareArrows, "Compare", Modifier.size(20.dp), tint = if (inCompare) Brand.Primary else Brand.Ink) }
                                 CircleAction({
                                     saved = !saved
-                                    scope.launch { online { repo.toggleSave(id) }.onSuccess { saved = it } }
+                                    scope.launch { online { repo.toggleSave(d?.base?.id ?: 0) }.onSuccess { saved = it } }
                                 }) { Icon(if (saved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, "Save", Modifier.size(20.dp), tint = if (saved) Brand.Danger else Brand.Ink) }
                             }
                         }
@@ -231,7 +237,7 @@ fun DetailScreen(repo: Repo, id: Int, onBack: () -> Unit, openListing: (Int) -> 
                 TextButton(enabled = !sending && text.isNotBlank(), onClick = {
                     sending = true; note = ""
                     scope.launch {
-                        online { repo.enquire(id, text.trim()) }
+                        online { repo.enquire(d?.base?.id ?: 0, text.trim()) }
                             .onSuccess { cid -> enquiry = false; if (cid > 0) openChat(cid) }
                             .onFailure { note = friendly(it) }
                         sending = false

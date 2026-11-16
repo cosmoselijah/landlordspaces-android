@@ -16,8 +16,8 @@ android {
         applicationId = "com.landlordspaces.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 5
+        versionName = "1.3.1"
     }
 
     signingConfigs {
@@ -60,4 +60,5 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.work:work-runtime:2.9.1")
 }
