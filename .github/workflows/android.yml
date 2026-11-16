@@ -19,12 +19,27 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # The build machine already has the Android SDK; this accepts its licences and adds the two packages the app needs.
+      # Finds the SDK manager on the build machine (downloads it if missing), accepts licences and adds the packages the app needs.
       - name: Android SDK packages
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "SDK=$SDK"
+          SM="$(command -v sdkmanager || true)"
+          [ -z "$SM" ] && SM="$(find "$SDK" /usr/local/lib/android -maxdepth 6 -name sdkmanager -type f 2>/dev/null | head -n1)"
+          if [ -z "$SM" ]; then
+            echo "sdkmanager not found, downloading command line tools"
+            mkdir -p "$SDK/cmdline-tools"
+            curl -fsSL -o "$RUNNER_TEMP/cmdtools.zip" https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q "$RUNNER_TEMP/cmdtools.zip" -d "$RUNNER_TEMP/cmdtools"
+            rm -rf "$SDK/cmdline-tools/latest"
+            mv "$RUNNER_TEMP/cmdtools/cmdline-tools" "$SDK/cmdline-tools/latest"
+            SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          echo "Using $SM"
+          yes | "$SM" --sdk_root="$SDK" --licenses > /dev/null || true
+          "$SM" --sdk_root="$SDK" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "sdk.dir=$SDK" > "$GITHUB_WORKSPACE/android/local.properties"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
