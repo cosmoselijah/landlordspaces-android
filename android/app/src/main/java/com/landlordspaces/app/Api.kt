@@ -13,8 +13,15 @@ private const val BASE = "$SITE/api/mobile/v1"
 class ApiError(val code: String, message: String, val status: Int) : Exception(message)
 
 object Api {
-    fun request(method: String, path: String, body: JSONObject? = null, token: String? = null): JSONObject {
-        val c = URL(BASE + path).openConnection() as HttpURLConnection
+    fun request(method: String, path: String, body: JSONObject? = null, token: String? = null): JSONObject =
+        exec(BASE + path, method, body, token, true)
+
+    /** Calls an existing website endpoint (same rules as the site) with the member's bearer token. */
+    fun site(method: String, path: String, body: JSONObject? = null, token: String? = null): JSONObject =
+        exec(SITE + path, method, body, token, false)
+
+    private fun exec(url: String, method: String, body: JSONObject?, token: String?, needOk: Boolean): JSONObject {
+        val c = URL(url).openConnection() as HttpURLConnection
         try {
             c.requestMethod = method
             c.connectTimeout = 15000
@@ -31,7 +38,7 @@ object Api {
             val stream = if (status in 200..299) c.inputStream else c.errorStream
             val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
             val json = try { JSONObject(text) } catch (e: Exception) { JSONObject() }
-            if (status !in 200..299 || !json.optBoolean("ok", false)) {
+            if (status !in 200..299 || (needOk && !json.optBoolean("ok", false))) {
                 throw ApiError(
                     json.optString("error", "http_$status"),
                     json.optString("message", "Something went wrong. Please try again."),
@@ -108,11 +115,33 @@ class Session(context: Context) {
         }
     }
 
+    /** Same as [call] but for the website's own JSON endpoints (favourites, enquiries, chat). */
+    fun callSite(method: String, path: String, body: JSONObject? = null): JSONObject {
+        try {
+            return Api.site(method, path, body, access)
+        } catch (e: ApiError) {
+            val r = refresh
+            if (e.status == 401 && r != null) {
+                try {
+                    save(Api.request("POST", "/auth/refresh", JSONObject().put("refresh_token", r)))
+                } catch (re: ApiError) {
+                    if (re.status == 401) clear()
+                    throw re
+                }
+                return Api.site(method, path, body, access)
+            }
+            throw e
+        }
+    }
+
     /** A valid access token, renewed if needed (used to open the website pages inside the app). */
     fun freshAccess(): String {
         call("GET", "/me")
         return access ?: ""
     }
+
+    /** Marketplace reads work signed out too; when signed in the token adds the member's "saved" flags. */
+    fun open(method: String, path: String): JSONObject = if (signedIn()) call(method, path) else Api.request(method, path, null, null)
 
     fun signOut() {
         try {
