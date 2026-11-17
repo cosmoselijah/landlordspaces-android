@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -87,13 +88,20 @@ fun App(session: Session, link: MutableState<String?>) {
     val context = LocalContext.current
     var phase by remember { mutableStateOf(if (session.signedIn()) "main" else "intro") }
     var film by remember { mutableStateOf(!Launch.played && !reducedMotion(context)) }
+    // If the server ends this session for good (password changed, signed out elsewhere), return to the sign-in screen.
+    LaunchedEffect(phase) {
+        while (phase == "main") {
+            delay(3000)
+            if (!session.signedIn()) phase = "auth"
+        }
+    }
     // Warm the first screen's data while the opening film plays, so the app is ready the moment it ends.
     LaunchedEffect(Unit) { online { Repo(session).listings("", "", "", "", "", 1) } }
     Box(Modifier.fillMaxSize()) {
         when (phase) {
             "intro" -> Onboarding { phase = "auth" }
             "auth" -> AuthScreen(session, startRegister = false, onDone = { phase = "main" }, onBack = { phase = "intro" })
-            else -> MainShell(session, link) { phase = "auth" }
+            else -> MainShell(session, link) { Drafts.clearAll(context); phase = "auth" }
         }
         if (film) IntroFilm { film = false; Launch.played = true }
     }
@@ -141,6 +149,15 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
     var bQuery by remember { mutableStateOf("") }
     val compare = remember { mutableStateListOf<Listing>() }
     val context = LocalContext.current
+    // Actions made offline (messages, saved homes) are sent as soon as there is a connection.
+    LaunchedEffect(Unit) {
+        while (true) {
+            if (session.pending() > 0 || Drafts.waiting(context) > 0) online { session.flush(); Drafts.sync(context, session) }
+            delay(15000)
+        }
+    }
+    // Keep the listing form's choices on the phone so the form opens with no connection.
+    LaunchedEffect(Unit) { online { repo.listingForm() } }
     val askNotify = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         Alerts.setup(context)
@@ -196,17 +213,12 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
             Column(Modifier.fillMaxSize()) {
-            if (repo.offline) OfflineBanner()
+            if (repo.offline) OfflineBanner(waiting = session.pending() + Drafts.waiting(context))
             Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 0 -> HomeScreen(repo, openListing, openBrowse, openWeb, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(SavedRoute) }, { push(AiRoute) })
                 1 -> BrowseScreen(repo, bMarket, bCat, bQuery, openListing, openWeb)
-                2 -> Column(Modifier.fillMaxSize().background(Color.White)) {
-                    StatusBar(darkBackground = false)
-                    var listTitle by remember { mutableStateOf("List a Property") }
-                    TopBar(listTitle, { tab = 0 })
-                    WebPage(session, "/account/listings/new", Modifier.weight(1f).fillMaxWidth(), onTitle = { listTitle = it })
-                }
+                2 -> ListScreen(session, repo, openWeb) { tab = 0 }
                 3 -> MessagesScreen(repo) { push(ChatRoute(it)) }
                 else -> AccountScreen(repo, openWeb, { push(SavedRoute) }, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(AiRoute) }, { session.clear(); Alerts.stop(context); onSignedOut() })
             }

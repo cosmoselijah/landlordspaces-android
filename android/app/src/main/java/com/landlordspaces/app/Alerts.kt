@@ -23,6 +23,8 @@ class AlertWorker(private val ctx: Context, params: WorkerParameters) : Worker(c
     override fun doWork(): Result {
         val session = Session(ctx)
         if (!session.signedIn()) return Result.success()
+        try { session.flush() } catch (e: Exception) { }
+        try { Drafts.sync(ctx, session) } catch (e: Exception) { }
         return try {
             val h = session.call("GET", "/home")
             val k = h.optJSONObject("kpi")

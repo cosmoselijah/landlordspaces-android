@@ -11,7 +11,9 @@ class Repo(val session: Session) {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     /** True while the screen is showing saved data because the phone is offline. */
-    var offline by mutableStateOf(false)
+    var offline: Boolean
+        get() = session.offline
+        set(v) { session.offline = v }
 
     /** Fetch fresh data and remember it; if the phone is offline, fall back to what was remembered. */
     private fun cached(key: String, fetch: () -> JSONObject): JSONObject {
@@ -48,7 +50,20 @@ class Repo(val session: Session) {
         return Pair(j.optJSONArray("cities").strings(), j.optJSONArray("types").strings())
     }
     fun saved(): List<Listing> = session.call("GET", "/saved").optJSONArray("listings").objects().map { Listing.from(it) }
-    fun toggleSave(id: Int): Boolean = session.callSite("POST", "/api/favourite/$id", JSONObject()).optBoolean("saved")
+    fun toggleSave(id: Int): Boolean {
+        return try {
+            val s = session.callSite("POST", "/api/favourite/$id", JSONObject()).optBoolean("saved")
+            session.cachePut("sv:$id", if (s) "1" else "0")
+            s
+        } catch (e: java.io.IOException) {
+            val now = session.cacheGet("sv:$id") != "1"
+            session.enqueue("POST", "/api/favourite/$id", JSONObject())
+            session.cachePut("sv:$id", if (now) "1" else "0")
+            offline = true
+            now
+        }
+    }
+    fun listingForm(): JSONObject = session.call("GET", "/listing-form")
     fun home(): JSONObject = cached("home") { session.call("GET", "/home") }
     fun conversations(): List<Convo> = session.call("GET", "/conversations").optJSONArray("conversations").objects().map { Convo.from(it) }
     fun thread(id: Int): Triple<String, String, List<Msg>> {
@@ -58,7 +73,15 @@ class Repo(val session: Session) {
         val prop = c.optJSONObject("property")
         return Triple(other.str("name"), prop?.str("title") ?: "", j.optJSONArray("messages").objects().map { Msg.from(it) })
     }
-    fun send(conv: Int, text: String) { session.callSite("POST", "/api/message/$conv", JSONObject().put("body", text)) }
+    fun send(conv: Int, text: String) {
+        val b = JSONObject().put("body", text)
+        try {
+            session.callSite("POST", "/api/message/$conv", b)
+        } catch (e: java.io.IOException) {
+            session.enqueue("POST", "/api/message/$conv", b)
+            offline = true
+        }
+    }
     fun enquire(propertyId: Int, text: String): Int =
         session.callSite("POST", "/api/connect/$propertyId", JSONObject().put("message", text)).optInt("conversation_id")
     fun notifications(): List<Notice> = session.call("GET", "/notifications").optJSONArray("notifications").objects().map { Notice.from(it) }
