@@ -88,6 +88,7 @@ object Drafts {
 
     fun clearAll(c: Context) {
         all(c).forEach { remove(c, it.id) }
+        c.applicationContext.getSharedPreferences("ls_studio", Context.MODE_PRIVATE).edit().clear().apply()
     }
 
     /** How many listings are waiting to be sent. */

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Official LandlordSpaces logo: teal tile, white house, golden dot (same geometry as the website's logo). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <path
+        android:fillColor="#0F766E"
+        android:pathData="M120,0 H392 A120,120 0 0 1 512,120 V392 A120,120 0 0 1 392,512 H120 A120,120 0 0 1 0,392 V120 A120,120 0 0 1 120,0 Z" />
+    <path
+        android:pathData="M104,262 L256,128 L408,262"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="32"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M144,238 V390 H368 V238"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="32"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M226,298 H286 V394 H226 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="26"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M236,212 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0" />
+</vector>

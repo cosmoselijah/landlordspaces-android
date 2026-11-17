@@ -28,6 +28,37 @@ object Api {
     fun site(method: String, path: String, body: JSONObject? = null, token: String? = null): JSONObject =
         exec(SITE + path, method, body, token, false)
 
+    /** Sends a chat attachment (with optional text) to the website's own message endpoint. */
+    fun siteUpload(path: String, field: String, file: java.io.File, mime: String, text: String, token: String?): JSONObject {
+        val boundary = "ls" + UUID.randomUUID().toString().replace("-", "")
+        val c = URL(SITE + path).openConnection() as HttpURLConnection
+        try {
+            c.requestMethod = "POST"
+            c.connectTimeout = 15000
+            c.readTimeout = 90000
+            c.doOutput = true
+            c.setChunkedStreamingMode(0)
+            c.setRequestProperty("Accept", "application/json")
+            c.setRequestProperty("User-Agent", "LandlordSpacesApp/" + BuildConfig.VERSION_NAME)
+            if (token != null) c.setRequestProperty("Authorization", "Bearer $token")
+            c.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            c.outputStream.use { o ->
+                o.write(("--$boundary\r\nContent-Disposition: form-data; name=\"body\"\r\n\r\n" + text + "\r\n").toByteArray())
+                o.write(("--$boundary\r\nContent-Disposition: form-data; name=\"" + field + "\"; filename=\"" + file.name + "\"\r\nContent-Type: " + mime + "\r\n\r\n").toByteArray())
+                file.inputStream().use { it.copyTo(o) }
+                o.write(("\r\n--$boundary--\r\n").toByteArray())
+            }
+            val status = c.responseCode
+            val stream = if (status in 200..299) c.inputStream else c.errorStream
+            val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+            val json = try { JSONObject(body) } catch (e: Exception) { JSONObject() }
+            if (status !in 200..299) throw ApiError("http_$status", json.optString("message", "The file could not be sent."), status)
+            return json
+        } finally {
+            c.disconnect()
+        }
+    }
+
     /** Sends one photo to the server as a multipart upload. */
     fun upload(path: String, file: java.io.File, token: String?): JSONObject {
         val boundary = "ls" + UUID.randomUUID().toString().replace("-", "")
@@ -216,6 +247,19 @@ class Session(context: Context) {
             if (e.status == 401 && refresh != null) {
                 renew(used)
                 return Api.upload(path, file, access)
+            }
+            throw e
+        }
+    }
+
+    fun siteUpload(path: String, field: String, file: java.io.File, mime: String, text: String): JSONObject {
+        val used = access
+        try {
+            return Api.siteUpload(path, field, file, mime, text, used)
+        } catch (e: ApiError) {
+            if (e.status == 401 && refresh != null) {
+                renew(used)
+                return Api.siteUpload(path, field, file, mime, text, access)
             }
             throw e
         }

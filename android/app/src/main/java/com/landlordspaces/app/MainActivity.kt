@@ -149,6 +149,13 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
     var bQuery by remember { mutableStateOf("") }
     val compare = remember { mutableStateListOf<Listing>() }
     val context = LocalContext.current
+    var unreadMsgs by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            online { repo.home() }.onSuccess { unreadMsgs = it.optJSONObject("kpi")?.optInt("unread_messages") ?: 0 }
+            delay(30000)
+        }
+    }
     // Actions made offline (messages, saved homes) are sent as soon as there is a connection.
     LaunchedEffect(Unit) {
         while (true) {
@@ -200,26 +207,17 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = Brand.Bg,
-        bottomBar = {
-            NavigationBar(containerColor = Color.White) {
-                val colors = NavigationBarItemDefaults.colors(selectedIconColor = Brand.Primary, selectedTextColor = Brand.Primary, indicatorColor = Brand.MintSoft, unselectedIconColor = Brand.Muted, unselectedTextColor = Brand.Muted)
-                NavigationBarItem(tab == 0, { stack.clear(); tab = 0 }, { Icon(if (tab == 0) Icons.Filled.Home else Icons.Outlined.Home, "Home") }, label = { Text("Home") }, colors = colors)
-                NavigationBarItem(tab == 1, { stack.clear(); tab = 1 }, { Icon(if (tab == 1) Icons.Filled.Search else Icons.Outlined.Search, "Browse") }, label = { Text("Browse") }, colors = colors)
-                NavigationBarItem(tab == 2, { stack.clear(); tab = 2 }, { Icon(if (tab == 2) Icons.Filled.AddBox else Icons.Outlined.AddBox, "List") }, label = { Text("List") }, colors = colors)
-                NavigationBarItem(tab == 3, { stack.clear(); tab = 3 }, { Icon(if (tab == 3) Icons.Filled.ChatBubble else Icons.Outlined.ChatBubbleOutline, "Messages") }, label = { Text("Messages") }, colors = colors)
-                NavigationBarItem(tab == 4, { stack.clear(); tab = 4 }, { Icon(if (tab == 4) Icons.Filled.Person else Icons.Outlined.Person, "Account") }, label = { Text("Account") }, colors = colors)
-            }
-        },
+        bottomBar = { LsBottomBar(tab, unreadMsgs) { stack.clear(); tab = it } },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
             Column(Modifier.fillMaxSize()) {
             if (repo.offline) OfflineBanner(waiting = session.pending() + Drafts.waiting(context))
             Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
-                0 -> HomeScreen(repo, openListing, openBrowse, openWeb, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(SavedRoute) }, { push(AiRoute) })
-                1 -> BrowseScreen(repo, bMarket, bCat, bQuery, openListing, openWeb)
-                2 -> ListScreen(session, repo, openWeb) { tab = 0 }
-                3 -> MessagesScreen(repo) { push(ChatRoute(it)) }
+                0 -> HomeScreen(repo, openListing, openBrowse, openWeb, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(SavedRoute) }, { push(AiRoute) }, { stack.clear(); tab = 4 })
+                1 -> BrowseScreen(repo, bMarket, bCat, bQuery, openListing, openWeb, { push(ChatRoute(it)) }, { push(NotificationsRoute) })
+                2 -> ListScreen(session, repo, openWeb, { tab = 0 }, { push(NotificationsRoute) }, { push(AiRoute) }, { stack.clear(); tab = 4 }, { push(WorkspaceRoute) })
+                3 -> MessagesScreen(repo, { push(ChatRoute(it)) }, openListing, { stack.clear(); tab = 1 }, { push(WorkspaceRoute) }, { push(AiRoute) }, { push(NotificationsRoute) }, { stack.clear(); tab = 4 })
                 else -> AccountScreen(repo, openWeb, { push(SavedRoute) }, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(AiRoute) }, { session.clear(); Alerts.stop(context); onSignedOut() })
             }
             }
@@ -233,7 +231,7 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
         Box(Modifier.fillMaxSize().background(Brand.Bg).pointerInput(Unit) { detectTapGestures { } }) {
             when (s) {
                 is ListingScreen -> DetailScreen(repo, s.key, { pop() }, openListing, { push(ChatRoute(it)) }, openWeb, compare.any { c -> c.id.toString() == s.key || c.id == (s.key.toIntOrNull() ?: -1) }, toggleCompare)
-                is ChatRoute -> ChatScreen(repo, s.id) { pop() }
+                is ChatRoute -> ChatScreen(repo, s.id, { pop() }, openListing)
                 is WebRoute -> Column(Modifier.fillMaxSize()) {
                     StatusBar(darkBackground = false)
                     var liveTitle by remember(i) { mutableStateOf(s.title) }

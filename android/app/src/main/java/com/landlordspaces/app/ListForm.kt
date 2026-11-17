@@ -63,7 +63,7 @@ private fun JSONArray?.texts(): List<String> {
     return out
 }
 
-private fun statusText(d: Draft): String = when (d.state) {
+internal fun statusText(d: Draft): String = when (d.state) {
     "queued" -> "Waiting for network. It will send by itself."
     "sending" -> "Sending..."
     "sent" -> "Saved to your account as a draft. Open My Listings to preview and publish."
@@ -71,87 +71,9 @@ private fun statusText(d: Draft): String = when (d.state) {
     else -> "Draft saved on this phone."
 }
 
-/** List a property: written and kept on the phone first, sent to the server whenever a connection exists. */
-@Composable
-fun ListScreen(session: Session, repo: Repo, openWeb: (String, String) -> Unit, onBack: () -> Unit) {
-    val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var drafts by remember { mutableStateOf(Drafts.all(ctx)) }
-    var editing by remember { mutableStateOf<Draft?>(null) }
-    var creating by remember { mutableStateOf(false) }
-    var form by remember { mutableStateOf<JSONObject?>(null) }
-    var formError by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        val r = online { repo.listingForm() }
-        r.onSuccess { form = it }
-        r.onFailure { formError = "Open this page once with internet so the form can be saved on your phone." }
-    }
-    LaunchedEffect(editing, creating) {
-        while (true) {
-            drafts = Drafts.all(ctx)
-            delay(2000)
-        }
-    }
-
-    if (creating || editing != null) {
-        val f = form
-        if (f == null) {
-            Column(Modifier.fillMaxSize().background(Brand.Bg)) {
-                StatusBar(darkBackground = false)
-                TopBar("List a Property", { creating = false; editing = null })
-                EmptyState("Getting the form ready", if (formError.isNotEmpty()) formError else "One moment.")
-            }
-        } else {
-            ListingEditor(session, f, editing, ctx, { creating = false; editing = null; drafts = Drafts.all(ctx) })
-        }
-        return
-    }
-
-    Column(Modifier.fillMaxSize().background(Brand.Bg)) {
-        StatusBar(darkBackground = false)
-        TopBar("List a Property", onBack)
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Write your listing anywhere, even with no network. It stays on your phone and goes online by itself when the connection returns.", color = Brand.Muted, fontSize = 14.sp)
-            PrimaryButton("New listing", { creating = true }, Modifier.fillMaxWidth())
-            if (formError.isNotEmpty() && form == null) Text(formError, color = Brand.Danger, fontSize = 13.sp)
-            if (drafts.isEmpty()) {
-                EmptyState("No listings written yet", "Tap New listing to start. Photos and details are saved on this phone.")
-            }
-            drafts.forEach { d ->
-                Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 1.dp) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(d.title, fontWeight = FontWeight.Bold, color = Brand.Ink, fontSize = 16.sp)
-                        val bits = listOf(d.fields.optString("type"), d.fields.optString("city"), if (d.photos.isNotEmpty()) "${d.photos.size} photo(s)" else "").filter { it.isNotBlank() }
-                        if (bits.isNotEmpty()) Text(bits.joinToString(" · "), color = Brand.Muted, fontSize = 13.sp)
-                        Text(statusText(d), color = if (d.state == "failed") Brand.Danger else if (d.state == "sent") Brand.Primary else Brand.Muted, fontSize = 13.sp)
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (d.state == "failed" && d.note.contains("profile", ignoreCase = true)) Pill("My Profile", true, { openWeb("My Profile", "/account/profile") })
-                            if (d.state == "sent") Pill("My Listings", false, { openWeb("My Listings", "/account/listings") })
-                            if (d.serverId == 0 && d.state != "sending" && d.state != "sent") Pill("Edit", false, { editing = d })
-                            if (d.state == "draft" || d.state == "failed") Pill("Send", true, {
-                                val x = d
-                                x.state = "queued"; x.note = ""
-                                Drafts.save(ctx, x)
-                                drafts = Drafts.all(ctx)
-                                scope.launch { online { Drafts.sync(ctx, session) }; drafts = Drafts.all(ctx) }
-                            })
-                            if (d.state == "queued") Pill("Send now", true, {
-                                scope.launch { online { Drafts.sync(ctx, session) }; drafts = Drafts.all(ctx) }
-                            })
-                            if (d.state != "sending") Pill("Delete", false, { Drafts.remove(ctx, d.id); drafts = Drafts.all(ctx) })
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ListingEditor(session: Session, form: JSONObject, existing: Draft?, ctx: android.content.Context, onClose: () -> Unit) {
+internal fun ListingEditor(session: Session, form: JSONObject, existing: Draft?, ctx: android.content.Context, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     val markets = form.optJSONArray("markets").texts().ifEmpty { listOf("sell", "rent", "buy") }
     val types = form.optJSONArray("types").texts()
