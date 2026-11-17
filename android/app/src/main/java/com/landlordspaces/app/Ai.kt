@@ -47,7 +47,7 @@ class AiMsg(val mine: Boolean, val text: String, val actions: List<Pair<String, 
 fun AiScreen(repo: Repo, onBack: () -> Unit, openWeb: (String, String) -> Unit, openListing: (Int) -> Unit) {
     StatusBar(darkBackground = false)
     val scope = rememberCoroutineScope()
-    val msgs = remember { mutableStateListOf(AiMsg(false, "Hello! I am your Landlordspaces assistant. Ask me about finding, renting, buying or listing property, or about using the app.", suggest = listOf("How do I list a property?", "How do I get verified?", "Is it safe to pay a deposit?"))) }
+    val msgs = remember { mutableStateListOf(AiMsg(false, "Hello! I am your Landlordspaces assistant. Ask me about finding, renting, buying or listing a property, or about using the app.", suggest = listOf("How do I list a property?", "How do I get verified?", "Is it safe to pay a deposit?"))) }
     var text by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     val list = rememberLazyListState()

@@ -140,7 +140,7 @@ fun ListScreen(
     var creating by remember { mutableStateOf(false) }
     var form by remember { mutableStateOf<JSONObject?>(null) }
     var formError by remember { mutableStateOf("") }
-    var tab by remember { mutableStateOf("drafts") }
+    var tab by remember { mutableStateOf(if (Drafts.all(ctx).isEmpty()) "published" else "drafts") }
     var expanded by remember { mutableStateOf(false) }
     var counts by remember { mutableStateOf(readCache(ctx, "counts")?.let { JSONObject(it) } ?: JSONObject()) }
     var server by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
@@ -205,7 +205,7 @@ fun ListScreen(
         if (f == null) {
             Column(Modifier.fillMaxSize().background(Brand.Bg)) {
                 StatusBar(darkBackground = false)
-                TopBar("Create listing", { creating = false; editing = null })
+                TopBar("Create property", { creating = false; editing = null })
                 EmptyState("Getting the form ready", if (formError.isNotEmpty()) formError else "One moment.")
             }
         } else {
@@ -280,8 +280,8 @@ fun ListScreen(
                     }
                     Row(Modifier.padding(horizontal = 16.dp).padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Listing Studio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 27.sp)
-                            Text("Create, manage and publish your property listings.", color = Color.White.copy(alpha = 0.92f), fontSize = 14.sp, lineHeight = 18.sp)
+                            Text("Property Studio", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 27.sp)
+                            Text("Create, manage and publish your properties.", color = Color.White.copy(alpha = 0.92f), fontSize = 14.sp, lineHeight = 18.sp)
                         }
                         Surface(onClick = { helpOpen = true }, shape = RoundedCornerShape(22.dp), color = Color.Transparent, border = BorderStroke(1.5.dp, Color.White), modifier = Modifier.padding(start = 8.dp).height(42.dp)) {
                             Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -302,15 +302,15 @@ fun ListScreen(
                             Icon(Icons.Outlined.CloudOff, null, Modifier.size(30.dp), tint = Brand.Primary)
                             Column(Modifier.padding(start = 12.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Offline Listing Mode", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Brand.Ink)
+                                    Text("Offline Property Mode", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Brand.Ink)
                                     Surface(Modifier.padding(start = 8.dp), shape = RoundedCornerShape(12.dp), color = Brand.Primary) {
                                         Text("Enabled", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
                                     }
                                 }
                                 Text(
-                                    if (repo.offline) "You are offline. Listings are saved on this phone and will sync when you are back online."
-                                    else if (busy) "Syncing ${waiting.size} listing" + (if (waiting.size == 1) "" else "s") + "…"
-                                    else "Create and save listings without internet. They'll automatically sync when you're back online.",
+                                    if (repo.offline) "You are offline. Properties are saved on this phone and will sync when you are back online."
+                                    else if (busy) "Syncing ${waiting.size} " + (if (waiting.size == 1) "property" else "properties") + "…"
+                                    else "Create and save properties without internet. They'll automatically sync when you're back online.",
                                     fontSize = 13.sp, color = Brand.Ink.copy(alpha = 0.8f), lineHeight = 17.sp, modifier = Modifier.padding(top = 4.dp),
                                 )
                             }
@@ -324,15 +324,15 @@ fun ListScreen(
                         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Brand.Deep, 0.42f to Brand.Deep.copy(alpha = 0.94f), 0.72f to Brand.Forest.copy(alpha = 0.3f), 1f to Color.Transparent)))
                         Column(Modifier.fillMaxWidth(0.68f).padding(start = 18.dp, top = 14.dp)) {
                             Surface(shape = RoundedCornerShape(12.dp), color = Brand.Primary) {
-                                Text("NEW LISTING", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                                Text("NEW PROPERTY", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
                             }
                             Text("Bring your property to the market.", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 24.sp, modifier = Modifier.padding(top = 8.dp))
-                            Text("Create a professional listing with photos, pricing, specifications and location.", color = Color.White.copy(alpha = 0.92f), fontSize = 12.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 4.dp), maxLines = 3)
+                            Text("Create a professional property with photos, pricing, specifications and location.", color = Color.White.copy(alpha = 0.92f), fontSize = 12.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = 4.dp), maxLines = 3)
                         }
                         Surface(onClick = { creating = true }, shape = RoundedCornerShape(24.dp), color = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 14.dp).height(48.dp).fillMaxWidth(0.6f)) {
                             Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.Add, null, Modifier.size(20.dp), tint = Brand.Primary)
-                                Text(" Create New Listing", color = Brand.Primary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1)
+                                Text(" Create New Property", color = Brand.Primary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1)
                             }
                         }
                     }
@@ -340,24 +340,24 @@ fun ListScreen(
                 // ---- shortcut cards ----
                 item(key = "shortcuts") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Shortcut(Icons.Outlined.EditNote, "Continue Draft", "Resume an unfinished property listing.", Modifier.weight(1f)) {
+                        Shortcut(Icons.Outlined.EditNote, "Continue Draft", "Resume an unfinished property.", Modifier.weight(1f)) {
                             if (recent != null) editing = recent else noDrafts = true
                         }
-                        Shortcut(Icons.Outlined.Layers, "Use Template", "Start with a saved listing template.", Modifier.weight(1f)) { templatesOpen = true }
+                        Shortcut(Icons.Outlined.Layers, "Use Template", "Start with a saved property template.", Modifier.weight(1f)) { templatesOpen = true }
                     }
                 }
                 // ---- overview ----
-                item(key = "overhead") { Text("Your Listing Overview", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Brand.Ink, modifier = Modifier.padding(top = 4.dp)) }
+                item(key = "overhead") { Text("Your Property Overview", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Brand.Ink, modifier = Modifier.padding(top = 4.dp)) }
                 item(key = "stats1") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Stat(Icons.Outlined.EditNote, two(draftCount), "Draft listings", Modifier.weight(1f)) { tab = "drafts"; expanded = true }
-                        Stat(Icons.Outlined.CheckCircleOutline, two(published), "Published listings", Modifier.weight(1f)) { tab = "published"; expanded = true }
+                        Stat(Icons.Outlined.EditNote, two(draftCount), "Draft properties", Modifier.weight(1f)) { tab = "drafts"; expanded = true }
+                        Stat(Icons.Outlined.CheckCircleOutline, two(published), "Published properties", Modifier.weight(1f)) { tab = "published"; expanded = true }
                     }
                 }
                 item(key = "stats2") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Stat(Icons.Outlined.CloudUpload, two(pendingSync), "Pending sync", Modifier.weight(1f)) { tab = "pending"; expanded = true }
-                        Stat(Icons.Outlined.Visibility, views.toString(), "Total listing views", Modifier.weight(1f)) { openWeb("Listing Performance", "/account/performance") }
+                        Stat(Icons.Outlined.Visibility, views.toString(), "Total property views", Modifier.weight(1f)) { openWeb("Property Performance", "/account/performance") }
                     }
                 }
                 // ---- management ----
@@ -384,7 +384,7 @@ fun ListScreen(
                     "drafts" -> {
                         val shown = unsent + waiting
                         val all = shown.size + server.size
-                        if (all == 0) item(key = "empty") { EmptyState("No drafts yet", "Tap Create New Listing. Photos and details are saved on this phone.") }
+                        if (all == 0) item(key = "empty") { EmptyState("No drafts yet", "Tap Create New Property. Photos and details are saved on this phone.") }
                         val limit = if (expanded) Int.MAX_VALUE else 3
                         items(shown.take(limit), key = { "l" + it.id }) { d ->
                             LocalDraftCard(d, { editing = d }, { editing = d }, { duplicate(d) }, { previewing = d }, { renaming = d }, { deleting = d }, {
@@ -392,7 +392,7 @@ fun ListScreen(
                             })
                         }
                         items(server.take(maxOf(0, limit - shown.size)), key = { "s" + it.optInt("id") }) { s ->
-                            ServerCard(s, tab, { openWeb("Edit listing", "/account/listings/" + s.optInt("id") + "/edit") }, openWeb, { st, done -> statusChange(s.optInt("id"), st, done) })
+                            ServerCard(s, tab, { openWeb("Edit property", "/account/listings/" + s.optInt("id") + "/edit") }, openWeb, { st, done -> statusChange(s.optInt("id"), st, done) })
                         }
                     }
                     "pending" -> {
@@ -401,7 +401,7 @@ fun ListScreen(
                         else item(key = "retry") {
                             Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, Brand.Line)) {
                                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(if (syncing) "Synchronising…" else "${q.size} listing" + (if (q.size == 1) "" else "s") + " not yet on the server", Modifier.weight(1f), fontSize = 13.sp, color = Brand.Ink)
+                                    Text(if (syncing) "Synchronising…" else "${q.size} " + (if (q.size == 1) "property" else "properties") + " not yet on the server", Modifier.weight(1f), fontSize = 13.sp, color = Brand.Ink)
                                     Pill(if (syncing) "Sending…" else "Retry all", true, { if (!syncing) { q.forEach { it.state = "queued"; it.note = ""; Drafts.save(ctx, it) }; syncNow() } })
                                 }
                             }
@@ -413,9 +413,9 @@ fun ListScreen(
                         }
                     }
                     else -> {
-                        if (server.isEmpty()) item(key = "empty") { EmptyState(if (tab == "published") "No published listings" else "No archived listings", "Listings you " + (if (tab == "published") "publish from My Listings" else "archive") + " appear here.") }
+                        if (server.isEmpty()) item(key = "empty") { EmptyState(if (tab == "published") "No published properties" else "No archived properties", "Properties you " + (if (tab == "published") "publish from My Properties" else "archive") + " appear here.") }
                         items(server.take(if (expanded) Int.MAX_VALUE else 3), key = { "s" + it.optInt("id") }) { s ->
-                            ServerCard(s, tab, { openWeb("Edit listing", "/account/listings/" + s.optInt("id") + "/edit") }, openWeb, { st, done -> statusChange(s.optInt("id"), st, done) })
+                            ServerCard(s, tab, { openWeb("Edit property", "/account/listings/" + s.optInt("id") + "/edit") }, openWeb, { st, done -> statusChange(s.optInt("id"), st, done) })
                         }
                     }
                 }
@@ -425,12 +425,12 @@ fun ListScreen(
 
     // ---- dialogs ----
     if (helpOpen) AlertDialog(
-        onDismissRequest = { helpOpen = false }, title = { Text("Listing Studio help") },
+        onDismissRequest = { helpOpen = false }, title = { Text("Property Studio help") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("• Create New Listing: write the listing with photos. It is saved on your phone as you go.", fontSize = 14.sp)
+                Text("• Create New Property: write the property with photos. It is saved on your phone as you go.", fontSize = 14.sp)
                 Text("• With no internet, tap Save and send when online. It goes by itself when the connection returns.", fontSize = 14.sp)
-                Text("• Drafts reach your account as drafts. Publish them from My Listings after you preview.", fontSize = 14.sp)
+                Text("• Drafts reach your account as drafts. Publish them from My Properties after you preview.", fontSize = 14.sp)
                 Text("• Photos should be at least about 1000 pixels wide.", fontSize = 14.sp)
             }
         },
@@ -439,8 +439,8 @@ fun ListScreen(
     )
     if (noDrafts) AlertDialog(
         onDismissRequest = { noDrafts = false }, title = { Text("No unfinished drafts") },
-        text = { Text("You have no draft on this phone yet. Create a new listing to begin.") },
-        confirmButton = { TextButton({ noDrafts = false; creating = true }) { Text("Create New Listing") } },
+        text = { Text("You have no draft on this phone yet. Create a new property to begin.") },
+        confirmButton = { TextButton({ noDrafts = false; creating = true }) { Text("Create New Property") } },
         dismissButton = { TextButton({ noDrafts = false }) { Text("Not now") } },
     )
     if (templatesOpen) AlertDialog(
@@ -461,7 +461,7 @@ fun ListScreen(
     deleting?.let { d ->
         AlertDialog(
             onDismissRequest = { deleting = null }, title = { Text("Delete this draft?") },
-            text = { Text("“" + d.title + "” and its photos will be removed from this phone. This cannot be undone." + if (d.serverId > 0) " A copy already sent to your account stays there until you remove it from My Listings." else "") },
+            text = { Text("“" + d.title + "” and its photos will be removed from this phone. This cannot be undone." + if (d.serverId > 0) " A copy already sent to your account stays there until you remove it from My Properties." else "") },
             confirmButton = { TextButton({ Drafts.remove(ctx, d.id); deleting = null; refreshAll(); message = "Draft deleted." }) { Text("Delete", color = Brand.Danger) } },
             dismissButton = { TextButton({ deleting = null }) { Text("Keep it") } },
         )
@@ -638,22 +638,22 @@ private fun ServerCard(s: JSONObject, tab: String, onEdit: () -> Unit, openWeb: 
     DraftShell(
         s.optString("title").ifBlank { "Untitled property" }, badge, color, line + " · " + s.optInt("views") + " views", s.optInt("photos"),
         { if (cover.isNotEmpty()) AsyncImage(cover, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) },
-        p, "", Brand.Muted, if (status == "published") "View listing" else "Continue editing",
-        { if (status == "published" && slug.isNotEmpty()) openWeb("Listing", "/property/$slug") else onEdit() },
+        p, "", Brand.Muted, if (status == "published") "View property" else "Continue editing",
+        { if (status == "published" && slug.isNotEmpty()) openWeb("Property", "/property/$slug") else onEdit() },
     ) {
         MenuItem({ Text("Edit") }, { onEdit() })
         MenuItem({ Text("Preview") }, { openWeb("Preview", "/account/listings/" + s.optInt("id") + "/preview") })
         if (status == "published") {
             MenuItem({ Text("Share") }, {
                 val url = "https://landlordspaces.com/property/$slug"
-                ctx.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, s.optString("title") + "\n" + url), "Share listing"))
+                ctx.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, s.optString("title") + "\n" + url), "Share property"))
             })
-            MenuItem({ Text("View performance") }, { openWeb("Listing Performance", "/account/performance") })
+            MenuItem({ Text("View performance") }, { openWeb("Property Performance", "/account/performance") })
             MenuItem({ Text(if (s.optString("market") == "rent") "Mark as rented" else "Mark as sold") }, { change(if (s.optString("market") == "rent") "rented" else "sold", "Marked as " + (if (s.optString("market") == "rent") "rented." else "sold.")) })
-            MenuItem({ Text("Pause (back to draft)") }, { change("draft", "Listing paused and moved to drafts.") })
+            MenuItem({ Text("Pause (back to draft)") }, { change("draft", "Property paused and moved to drafts.") })
         }
         if (status == "archived") MenuItem({ Text("Restore as draft") }, { change("draft", "Restored as a draft.") })
-        else MenuItem({ Text("Archive") }, { change("archived", "Listing archived.") })
+        else MenuItem({ Text("Archive") }, { change("archived", "Property archived.") })
     }
 }
 

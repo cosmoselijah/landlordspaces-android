@@ -36,7 +36,8 @@ fun money(price: Double, currency: String): String {
 class Listing(
     val id: Int, val title: String, val market: String, val type: String, val price: Double, val currency: String, val period: String,
     val bedrooms: Int?, val bathrooms: Int?, val parking: Int?, val size: Double, val sizeUnit: String, val area: String, val cover: String,
-    val photos: Int, val verified: Boolean, val featured: Boolean, var saved: Boolean, val ownerName: String, val ownerVerified: Boolean,
+    val photos: Int, val verified: Boolean, val featured: Boolean, var saved: Boolean, val ownerName: String, val ownerVerified: Boolean, val slug: String = "",
+    val lat: Double? = null, val lng: Double? = null,
 ) {
     val priceText: String get() = money(price, currency)
     val periodText: String get() = if (period.isNotEmpty() && market == "rent") "/" + period else ""
@@ -49,7 +50,8 @@ class Listing(
                 o.optInt("id"), o.str("title"), o.str("market"), o.str("type"), o.optDouble("price", 0.0), o.str("currency").ifEmpty { "NGN" }, o.str("period"),
                 o.intOrNull("bedrooms"), o.intOrNull("bathrooms"), o.intOrNull("parking"), o.optDouble("size", 0.0), o.str("size_unit").ifEmpty { "sqm" },
                 o.str("area"), img(o.str("cover")), o.optInt("photos"), o.optBoolean("verified"), o.optBoolean("featured"), o.optBoolean("saved"),
-                ow.str("name"), ow.optBoolean("verified"),
+                ow.str("name"), ow.optBoolean("verified"), o.str("slug"),
+                if (o.isNull("lat") || !o.has("lat")) null else o.optDouble("lat"), if (o.isNull("lng") || !o.has("lng")) null else o.optDouble("lng"),
             )
         }
     }
@@ -77,18 +79,20 @@ class Detail(
 
 class Convo(
     val id: Int, val propertyTitle: String, val cover: String, val otherName: String, val otherAvatar: String, val last: String, val lastAt: String, val unread: Int,
+    val category: String = "buyer", val verified: Boolean = false, val propertyId: Int = 0,
 ) {
     companion object {
         fun from(o: JSONObject) = Convo(
             o.optInt("id"), o.str("property_title"), img(o.str("cover")), o.str("other_name").ifEmpty { "Member" }, img(o.str("other_avatar")),
             o.str("last_body"), o.str("last_message_at"), o.optInt("unread"),
+            o.str("category").ifEmpty { "buyer" }, o.optBoolean("other_verified"), o.optInt("property_id"),
         )
     }
 }
 
-class Msg(val id: Int, val mine: Boolean, val body: String, val attachment: String, val createdAt: String) {
+class Msg(val id: Int, val mine: Boolean, val body: String, val attachment: String, val createdAt: String, val read: Boolean = false, val attType: String = "") {
     companion object {
-        fun from(o: JSONObject) = Msg(o.optInt("id"), o.optBoolean("mine"), o.str("body"), img(o.str("attachment_url")), o.str("created_at"))
+        fun from(o: JSONObject) = Msg(o.optInt("id"), o.optBoolean("mine"), o.str("body"), img(o.str("attachment_url")), o.str("created_at"), o.optBoolean("read"), o.str("attachment_type"))
     }
 }
 

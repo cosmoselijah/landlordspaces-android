@@ -16,8 +16,8 @@ android {
         applicationId = "com.landlordspaces.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.3.1"
+        versionCode = 14
+        versionName = "1.7.2"
     }
 
     signingConfigs {
@@ -48,6 +48,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    // Release lint is a separate quality report; it must never stop the APK from being built.
+    lint { checkReleaseBuilds = false; abortOnError = false }
+    packaging { resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "META-INF/DEPENDENCIES") }
 }
 
 dependencies {

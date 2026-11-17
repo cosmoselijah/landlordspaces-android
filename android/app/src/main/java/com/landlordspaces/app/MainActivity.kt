@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -54,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -86,13 +88,20 @@ fun App(session: Session, link: MutableState<String?>) {
     val context = LocalContext.current
     var phase by remember { mutableStateOf(if (session.signedIn()) "main" else "intro") }
     var film by remember { mutableStateOf(!Launch.played && !reducedMotion(context)) }
+    // If the server ends this session for good (password changed, signed out elsewhere), return to the sign-in screen.
+    LaunchedEffect(phase) {
+        while (phase == "main") {
+            delay(3000)
+            if (!session.signedIn()) phase = "auth"
+        }
+    }
     // Warm the first screen's data while the opening film plays, so the app is ready the moment it ends.
     LaunchedEffect(Unit) { online { Repo(session).listings("", "", "", "", "", 1) } }
     Box(Modifier.fillMaxSize()) {
         when (phase) {
             "intro" -> Onboarding { phase = "auth" }
             "auth" -> AuthScreen(session, startRegister = false, onDone = { phase = "main" }, onBack = { phase = "intro" })
-            else -> MainShell(session, link) { phase = "auth" }
+            else -> MainShell(session, link) { Drafts.clearAll(context); phase = "auth" }
         }
         if (film) IntroFilm { film = false; Launch.played = true }
     }
@@ -140,6 +149,22 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
     var bQuery by remember { mutableStateOf("") }
     val compare = remember { mutableStateListOf<Listing>() }
     val context = LocalContext.current
+    var unreadMsgs by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            online { repo.home() }.onSuccess { unreadMsgs = it.optJSONObject("kpi")?.optInt("unread_messages") ?: 0 }
+            delay(30000)
+        }
+    }
+    // Actions made offline (messages, saved homes) are sent as soon as there is a connection.
+    LaunchedEffect(Unit) {
+        while (true) {
+            if (session.pending() > 0 || Drafts.waiting(context) > 0) online { session.flush(); Drafts.sync(context, session) }
+            delay(15000)
+        }
+    }
+    // Keep the listing form's choices on the phone so the form opens with no connection.
+    LaunchedEffect(Unit) { online { repo.listingForm() } }
     val askNotify = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         Alerts.setup(context)
@@ -154,6 +179,7 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
     // Pages that have a native screen open natively; every other website page opens inside the signed-in web view.
     val openWeb: (String, String) -> Unit = { t, p ->
         when {
+            p == "/account/listings" -> { stack.clear(); tab = 2 }
             p == "/tenant-management" && t == "Tenant Management" -> push(TenantsRoute)
             p == "/account/profile" && t == "My Profile" -> push(ProfileRoute)
             p == "/account/security" -> push(SecurityRoute)
@@ -182,31 +208,17 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = Brand.Bg,
-        bottomBar = {
-            NavigationBar(containerColor = Color.White) {
-                val colors = NavigationBarItemDefaults.colors(selectedIconColor = Brand.Primary, selectedTextColor = Brand.Primary, indicatorColor = Brand.MintSoft, unselectedIconColor = Brand.Muted, unselectedTextColor = Brand.Muted)
-                NavigationBarItem(tab == 0, { stack.clear(); tab = 0 }, { Icon(if (tab == 0) Icons.Filled.Home else Icons.Outlined.Home, "Home") }, label = { Text("Home") }, colors = colors)
-                NavigationBarItem(tab == 1, { stack.clear(); tab = 1 }, { Icon(if (tab == 1) Icons.Filled.Search else Icons.Outlined.Search, "Browse") }, label = { Text("Browse") }, colors = colors)
-                NavigationBarItem(tab == 2, { stack.clear(); tab = 2 }, { Icon(if (tab == 2) Icons.Filled.AddBox else Icons.Outlined.AddBox, "List") }, label = { Text("List") }, colors = colors)
-                NavigationBarItem(tab == 3, { stack.clear(); tab = 3 }, { Icon(if (tab == 3) Icons.Filled.ChatBubble else Icons.Outlined.ChatBubbleOutline, "Messages") }, label = { Text("Messages") }, colors = colors)
-                NavigationBarItem(tab == 4, { stack.clear(); tab = 4 }, { Icon(if (tab == 4) Icons.Filled.Person else Icons.Outlined.Person, "Account") }, label = { Text("Account") }, colors = colors)
-            }
-        },
+        bottomBar = { LsBottomBar(tab, unreadMsgs) { stack.clear(); tab = it } },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
             Column(Modifier.fillMaxSize()) {
-            if (repo.offline) OfflineBanner()
+            if (repo.offline) OfflineBanner(waiting = session.pending() + Drafts.waiting(context))
             Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
-                0 -> HomeScreen(repo, openListing, openBrowse, openWeb, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(SavedRoute) }, { push(AiRoute) })
-                1 -> BrowseScreen(repo, bMarket, bCat, bQuery, openListing, openWeb)
-                2 -> Column(Modifier.fillMaxSize().background(Color.White)) {
-                    StatusBar(darkBackground = false)
-                    var listTitle by remember { mutableStateOf("List a Property") }
-                    TopBar(listTitle, { tab = 0 })
-                    WebPage(session, "/account/listings/new", Modifier.weight(1f).fillMaxWidth(), onTitle = { listTitle = it })
-                }
-                3 -> MessagesScreen(repo) { push(ChatRoute(it)) }
+                0 -> HomeScreen(repo, openListing, openBrowse, openWeb, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(SavedRoute) }, { push(AiRoute) }, { stack.clear(); tab = 4 })
+                1 -> BrowseScreen(repo, bMarket, bCat, bQuery, openListing, openWeb, { push(ChatRoute(it)) }, { push(NotificationsRoute) })
+                2 -> ListScreen(session, repo, openWeb, { tab = 0 }, { push(NotificationsRoute) }, { push(AiRoute) }, { stack.clear(); tab = 4 }, { push(WorkspaceRoute) })
+                3 -> MessagesScreen(repo, { push(ChatRoute(it)) }, openListing, { stack.clear(); tab = 1 }, { push(WorkspaceRoute) }, { push(AiRoute) }, { push(NotificationsRoute) }, { stack.clear(); tab = 4 })
                 else -> AccountScreen(repo, openWeb, { push(SavedRoute) }, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(AiRoute) }, { session.clear(); Alerts.stop(context); onSignedOut() })
             }
             }
@@ -220,7 +232,7 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
         Box(Modifier.fillMaxSize().background(Brand.Bg).pointerInput(Unit) { detectTapGestures { } }) {
             when (s) {
                 is ListingScreen -> DetailScreen(repo, s.key, { pop() }, openListing, { push(ChatRoute(it)) }, openWeb, compare.any { c -> c.id.toString() == s.key || c.id == (s.key.toIntOrNull() ?: -1) }, toggleCompare)
-                is ChatRoute -> ChatScreen(repo, s.id) { pop() }
+                is ChatRoute -> ChatScreen(repo, s.id, { pop() }, openListing)
                 is WebRoute -> Column(Modifier.fillMaxSize()) {
                     StatusBar(darkBackground = false)
                     var liveTitle by remember(i) { mutableStateOf(s.title) }

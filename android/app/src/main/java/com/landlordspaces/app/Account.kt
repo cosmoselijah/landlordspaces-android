@@ -181,7 +181,7 @@ fun AccountScreen(
                 LsTopBar(avatar, name, unread, openWorkspace, openAi, openNotifications, editProfile)
                 Column(Modifier.padding(horizontal = 16.dp)) {
                     Text("Account", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 26.sp)
-                    Text("Manage your profile, listings, properties and settings.", color = Color.White.copy(alpha = 0.92f), fontSize = 14.sp)
+                    Text("Manage your profile, properties and settings.", color = Color.White.copy(alpha = 0.92f), fontSize = 14.sp)
                 }
             }
         }
@@ -224,14 +224,14 @@ fun AccountScreen(
             }
             // ---- four real counters ----
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Counter(Icons.Outlined.Home, active.toString(), "Active Listings", Modifier.weight(1f).clickable { openWeb("My Listings", "/account/listings") })
+                Counter(Icons.Outlined.Home, active.toString(), "Active Properties", Modifier.weight(1f).clickable { openWeb("My Properties", "/account/listings") })
                 Counter(Icons.Outlined.FavoriteBorder, saved.toString(), "Saved Properties", Modifier.weight(1f).clickable { openSaved() })
                 Counter(Icons.Outlined.Notifications, unread.toString(), "Unread Notifications", Modifier.weight(1f).clickable { openNotifications() })
-                Counter(Icons.Outlined.Visibility, java.text.NumberFormat.getIntegerInstance().format(views), "Listing Views", Modifier.weight(1f).clickable { openWeb("Listing Performance", "/account/performance") })
+                Counter(Icons.Outlined.Visibility, java.text.NumberFormat.getIntegerInstance().format(views), "Property Views", Modifier.weight(1f).clickable { openWeb("Property Performance", "/account/performance") })
             }
             Section(Icons.Outlined.WorkOutline, "Workspace") {
                 AccountRow(Icons.Outlined.Dashboard, "My Workspace", openWorkspace); Divider1()
-                AccountRow(Icons.Outlined.Apartment, "My Listings", { openWeb("My Listings", "/account/listings") })
+                AccountRow(Icons.Outlined.Apartment, "My Properties", { openWeb("My Properties", "/account/listings") })
             }
             Section(Icons.Outlined.Person, "Personal & Property") {
                 AccountRow(Icons.Outlined.Person, "My Profile", editProfile); Divider1()
@@ -271,7 +271,7 @@ fun AccountScreen(
     )
     if (deleteAsk) AlertDialog(
         onDismissRequest = { deleteAsk = false }, title = { Text("Delete your account?") },
-        text = { Text("Deleting your account removes your profile, listings and messages and cannot be undone. You will be asked to confirm with your password on the website before anything is deleted.") },
+        text = { Text("Deleting your account removes your profile, properties and messages and cannot be undone. You will be asked to confirm with your password on the website before anything is deleted.") },
         confirmButton = { TextButton({ deleteAsk = false; openInBrowser(context, "$SITE/delete-account") }) { Text("Continue", color = Brand.Danger) } },
         dismissButton = { TextButton({ deleteAsk = false }) { Text("Keep my account") } },
     )

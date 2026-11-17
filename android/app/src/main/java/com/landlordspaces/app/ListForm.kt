@@ -66,8 +66,8 @@ private fun JSONArray?.texts(): List<String> {
 internal fun statusText(d: Draft): String = when (d.state) {
     "queued" -> "Waiting for network. It will send by itself."
     "sending" -> "Sending..."
-    "sent" -> "Saved to your account as a draft. Open My Listings to preview and publish."
-    "failed" -> d.note.ifBlank { "The server could not accept this listing." }
+    "sent" -> "Saved to your account as a draft. Open My Properties to preview and publish."
+    "failed" -> d.note.ifBlank { "The server could not accept this property." }
     else -> "Draft saved on this phone."
 }
 
@@ -124,7 +124,7 @@ internal fun ListingEditor(session: Session, form: JSONObject, existing: Draft?,
     fun commit(send: Boolean) {
         val n = price.replace(",", "").trim().toDoubleOrNull()
         error = when {
-            title.trim().length < 8 -> "Give the listing a descriptive title (at least 8 characters)."
+            title.trim().length < 8 -> "Give the property a descriptive title (at least 8 characters)."
             description.trim().length < 30 -> "Add a description of at least 30 characters."
             type.isEmpty() -> "Choose a property type."
             n == null || n < 0 -> "Enter a valid price."
@@ -152,7 +152,7 @@ internal fun ListingEditor(session: Session, form: JSONObject, existing: Draft?,
 
     Column(Modifier.fillMaxSize().background(Color.White)) {
         StatusBar(darkBackground = false)
-        TopBar(if (existing == null) "New listing" else "Edit listing", { cancel() })
+        TopBar(if (existing == null) "New property" else "Edit property", { cancel() })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Saved on this phone as you go. Nothing needs a connection until you press Save and send.", color = Brand.Muted, fontSize = 13.sp)
             Text("What are you doing?", fontWeight = FontWeight.SemiBold, color = Brand.Ink)

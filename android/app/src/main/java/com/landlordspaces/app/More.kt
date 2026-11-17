@@ -115,7 +115,7 @@ fun NotificationsScreen(repo: Repo, onBack: () -> Unit, openWeb: (String, String
             TextButton({ scope.launch { online { repo.markAllRead() }.onSuccess { rows = rows.map { n -> Notice(n.id, n.type, n.title, n.body, n.url, true, n.createdAt) } } } }) { Text("Mark all read", color = Brand.Primary) }
         })
         Loadable(loading, error, { load() }) {
-            if (rows.isEmpty()) EmptyState("You're all caught up", "New alerts about enquiries, messages and listings show up here.")
+            if (rows.isEmpty()) EmptyState("You're all caught up", "New alerts about enquiries, messages and properties show up here.")
             else LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(rows, key = { it.id }) { n ->
                     Surface(
@@ -189,7 +189,7 @@ fun WorkspaceScreen(repo: Repo, onBack: () -> Unit, openListing: (Int) -> Unit, 
                 }
                 if (tab == 0) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatTile(Icons.Outlined.Apartment, "${st.optInt("active")}", "Active Listings", Brand.Primary, Modifier.weight(1f))
+                        StatTile(Icons.Outlined.Apartment, "${st.optInt("active")}", "Active Properties", Brand.Primary, Modifier.weight(1f))
                         StatTile(Icons.Outlined.Notifications, "${st.optInt("enquiries")}", "Enquiries", Brand.Violet, Modifier.weight(1f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -206,9 +206,9 @@ fun WorkspaceScreen(repo: Repo, onBack: () -> Unit, openListing: (Int) -> Unit, 
                         QuickAction(Icons.Outlined.ViewInAr, "Floor Plan Studio", { openWeb("Floor Plan Studio", "/account/studio") }, Modifier.weight(1f))
                     }
                 } else {
-                    if (mine.isEmpty()) EmptyState("No listings yet", "List your first property and it will show here.")
+                    if (mine.isEmpty()) EmptyState("No properties yet", "List your first property and it will show here.")
                     mine.forEach { p ->
-                        Surface(onClick = { if (p.str("status") == "published") openListing(p.optInt("id")) else openWeb("My Listings", "/account/listings") }, shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 1.dp) {
+                        Surface(onClick = { if (p.str("status") == "published") openListing(p.optInt("id")) else openWeb("My Properties", "/account/listings") }, shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 1.dp) {
                             Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 coil.compose.AsyncImage(model = img(p.str("cover")), contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)).background(Brand.MintSoft))
                                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
@@ -225,70 +225,5 @@ fun WorkspaceScreen(repo: Repo, onBack: () -> Unit, openListing: (Int) -> Unit, 
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit, badge: Int = 0, danger: Boolean = false) {
-    Row(Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 20.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, Modifier.size(22.dp), tint = if (danger) Brand.Danger else Brand.Ink)
-        Text(label, color = if (danger) Brand.Danger else Brand.Ink, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f).padding(start = 16.dp))
-        if (badge > 0) Box(Modifier.size(22.dp).clip(CircleShape).background(Brand.Danger), contentAlignment = Alignment.Center) { Text("$badge", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-        if (!danger) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Brand.Muted)
-    }
-}
-
-@Composable
-fun AccountScreen(
-    repo: Repo, openWeb: (String, String) -> Unit, openSaved: () -> Unit, openNotifications: () -> Unit, openWorkspace: () -> Unit, openAi: () -> Unit, onSignedOut: () -> Unit,
-) {
-    StatusBar(darkBackground = false)
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var user by remember { mutableStateOf<JSONObject?>(null) }
-    var unread by remember { mutableStateOf(0) }
-    var confirm by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        online { Pair(repo.me(), repo.home()) }.onSuccess { (u, h) -> user = u; unread = h.optJSONObject("kpi")?.optInt("unread_notifications") ?: 0 }
-    }
-    Column(Modifier.fillMaxSize().background(Color.White).statusBarsPadding().verticalScroll(rememberScrollState())) {
-        Text("Account", fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, modifier = Modifier.padding(20.dp))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Avatar(img(user?.str("avatar") ?: ""), user?.str("name") ?: repo.session.name, 64.dp)
-            Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(user?.str("name") ?: repo.session.name, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                    if (user?.optBoolean("verified") == true) Icon(Icons.Filled.Verified, "Verified", Modifier.padding(start = 6.dp).size(18.dp), tint = Brand.Primary)
-                }
-                Text(user?.str("email") ?: "", color = Brand.Muted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        MenuRow(Icons.Outlined.Dashboard, "My Workspace", openWorkspace)
-        MenuRow(Icons.Outlined.Person, "My Profile", { openWeb("My Profile", "/account/profile") })
-        MenuRow(Icons.Outlined.Apartment, "My Listings", { openWeb("My Listings", "/account/listings") })
-        MenuRow(Icons.Outlined.FavoriteBorder, "Saved Properties", openSaved)
-        MenuRow(Icons.Outlined.ViewInAr, "Floor Plan Studio", { openWeb("Floor Plan Studio", "/account/studio") })
-        MenuRow(Icons.Outlined.Groups, "Tenant Management", { openWeb("Tenant Management", "/tenant-management") })
-        MenuRow(Icons.Outlined.Savings, "Rent Savings", { openWeb("Rent Savings", "/account/rent-savings") })
-        MenuRow(Icons.Outlined.Notifications, "Notifications", openNotifications, badge = unread)
-        MenuRow(Icons.Outlined.Security, "Security & Privacy", { openWeb("Security & Privacy", "/account/security") })
-        MenuRow(Icons.Outlined.AutoAwesome, "Ask AI", openAi)
-        MenuRow(Icons.Outlined.Info, "Help & Support", { openWeb("Help & Support", "/help") })
-        MenuRow(Icons.AutoMirrored.Filled.ExitToApp, "Sign Out", { confirm = true }, danger = true)
-        Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Privacy", color = Brand.Muted, fontSize = 12.sp, modifier = Modifier.clickable { openInBrowser(context, "$SITE/p/privacy") })
-            Text("Terms", color = Brand.Muted, fontSize = 12.sp, modifier = Modifier.clickable { openInBrowser(context, "$SITE/p/terms") })
-            Text("Delete account", color = Brand.Muted, fontSize = 12.sp, modifier = Modifier.clickable { openInBrowser(context, "$SITE/delete-account") })
-            Spacer(Modifier.weight(1f))
-            Text("v" + BuildConfig.VERSION_NAME, color = Brand.Muted, fontSize = 12.sp)
-        }
-    }
-    if (confirm) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { confirm = false }, title = { Text("Sign out?") }, text = { Text("You will need to sign in again to use your account.") },
-            confirmButton = { TextButton({ confirm = false; scope.launch { online { repo.session.signOut() }; onSignedOut() } }) { Text("Sign out", color = Brand.Danger) } },
-            dismissButton = { TextButton({ confirm = false }) { Text("Cancel") } },
-        )
     }
 }

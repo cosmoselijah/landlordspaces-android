@@ -51,10 +51,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 @Composable
-fun OfflineBanner(modifier: Modifier = Modifier) {
+fun OfflineBanner(modifier: Modifier = Modifier, waiting: Int = 0) {
     Row(modifier.fillMaxWidth().background(Brand.Ink).padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.WifiOff, null, Modifier.size(14.dp), tint = Color.White)
-        Text("  You are offline. Showing saved results.", color = Color.White, fontSize = 12.sp)
+        Text("  You are offline. Showing saved results." + (if (waiting > 0) " $waiting change(s) will send when you are back online." else ""), color = Color.White, fontSize = 12.sp)
     }
 }
 
@@ -263,7 +263,7 @@ fun HelpScreen(repo: Repo, onBack: () -> Unit, openWeb: (String, String) -> Unit
     val faq = listOf(
         "How do I contact an owner?" to "Open a property and tap Contact Agent. Your message appears under Messages.",
         "How do I list a property?" to "Tap List in the bottom bar and follow the steps. Photos can come from your camera or gallery.",
-        "Why is a property marked Verified?" to "Verified listings have had the owner or agent checked by our team.",
+        "Why is a property marked Verified?" to "Verified properties have had the owner or agent checked by our team.",
         "How do I reset my password?" to "On the sign in screen tap Forgot password and follow the email link.",
     )
     var open by remember { mutableStateOf(-1) }

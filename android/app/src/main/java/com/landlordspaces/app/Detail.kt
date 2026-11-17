@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Bathtub
 import androidx.compose.material.icons.outlined.Bed
 import androidx.compose.material.icons.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.DirectionsCar
+import androidx.compose.material.icons.outlined.Directions
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Share
@@ -196,14 +197,42 @@ fun DetailScreen(
                                 if (x.hasFloorPlan) {
                                     Text("This property has an interactive floor plan with 2D and 3D views, room sizes and photos.", color = Brand.Muted)
                                     PrimaryButton("Open floor plan", { openWeb("Floor Plan", x.floorPlanUrl) }, Modifier.fillMaxWidth().padding(top = 12.dp), icon = Icons.Outlined.ViewInAr)
-                                } else Text("The owner has not added a floor plan to this listing yet.", color = Brand.Muted)
+                                } else Text("The owner has not added a floor plan to this property yet.", color = Brand.Muted)
                             }
                             else -> Column {
-                                Text(x.address.ifEmpty { x.base.area }, fontWeight = FontWeight.SemiBold)
+                                val place = x.address.ifEmpty { x.base.area }
+                                val la = x.base.lat; val ln = x.base.lng
+                                val hasPin = la != null && ln != null && !(la == 0.0 && ln == 0.0)
+                                Text(place, fontWeight = FontWeight.SemiBold)
+                                if (hasPin) {
+                                    val d = 0.004
+                                    val mapUrl = "https://www.openstreetmap.org/export/embed.html?bbox=" + (ln!! - d * 1.5) + "," + (la!! - d) + "," + (ln + d * 1.5) + "," + (la + d) + "&layer=mapnik&marker=" + la + "," + ln
+                                    androidx.compose.ui.viewinterop.AndroidView(
+                                        modifier = Modifier.fillMaxWidth().height(260.dp).padding(top = 12.dp).clip(RoundedCornerShape(16.dp)),
+                                        factory = { ctx ->
+                                            android.webkit.WebView(ctx).apply {
+                                                settings.javaScriptEnabled = true
+                                                settings.domStorageEnabled = true
+                                                setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
+                                                webViewClient = android.webkit.WebViewClient()
+                                                loadUrl(mapUrl)
+                                            }
+                                        },
+                                    )
+                                }
+                                val dest = if (hasPin) "$la,$ln" else Uri.encode(place)
+                                PrimaryButton("Get directions", {
+                                    try {
+                                        val i = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + dest)).setPackage("com.google.android.apps.maps")
+                                        context.startActivity(i)
+                                    } catch (e: Exception) {
+                                        openInBrowser(context, "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + dest)
+                                    }
+                                }, Modifier.fillMaxWidth().padding(top = 12.dp), icon = Icons.Outlined.Directions)
                                 OutlineButton("Open in Maps", {
-                                    val q = Uri.encode(x.address.ifEmpty { x.base.area })
-                                    try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=$q"))) } catch (e: Exception) { openInBrowser(context, "https://www.google.com/maps/search/?api=1&query=$q") }
-                                }, Modifier.fillMaxWidth().padding(top = 12.dp))
+                                    val geo = if (hasPin) "geo:$la,$ln?q=$la,$ln(" + Uri.encode(x.base.title) + ")" else "geo:0,0?q=" + Uri.encode(place)
+                                    try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(geo))) } catch (e: Exception) { openInBrowser(context, "https://www.google.com/maps/search/?api=1&query=" + dest) }
+                                }, Modifier.fillMaxWidth().padding(top = 8.dp))
                             }
                         }
                         if (x.similar.isNotEmpty()) {
@@ -216,7 +245,7 @@ fun DetailScreen(
                 }
                 Surface(shadowElevation = 12.dp, color = Color.White) {
                     Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (x.own) PrimaryButton("Manage my listings", { openWeb("My Listings", "/account/listings") }, Modifier.weight(1f))
+                        if (x.own) PrimaryButton("Manage my properties", { openWeb("My Properties", "/account/listings") }, Modifier.weight(1f))
                         else PrimaryButton("Contact Agent", { enquiry = true }, Modifier.weight(1f))
                         if (x.phone.isNotEmpty()) Surface(
                             onClick = { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + x.phone))) }, shape = RoundedCornerShape(26.dp), color = Color.White,

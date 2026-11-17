@@ -166,7 +166,7 @@ object Drafts {
                         update(c, id) { it.state = "queued" }
                         break
                     }
-                    update(c, id) { it.state = "failed"; it.note = e.message ?: "The server could not accept this listing." }
+                    update(c, id) { it.state = "failed"; it.note = e.message ?: "The server could not accept this property." }
                 } catch (e: java.io.IOException) {
                     update(c, id) { it.state = "queued" }
                     break
