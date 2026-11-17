@@ -1,10 +1,6 @@
 package com.landlordspaces.app
 
 import android.content.Context
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -12,10 +8,6 @@ import java.util.UUID
 
 const val SITE = "https://landlordspaces.com"
 private const val BASE = "$SITE/api/mobile/v1"
-
-/** A refresh token works only once, so every call in this app shares one renewal at a time. */
-private val RENEW_LOCK = Any()
-private val OUTBOX_LOCK = Any()
 
 /** An error answer from the LandlordSpaces server (message is safe to show to the person). */
 class ApiError(val code: String, message: String, val status: Int) : Exception(message)
@@ -27,69 +19,6 @@ object Api {
     /** Calls an existing website endpoint (same rules as the site) with the member's bearer token. */
     fun site(method: String, path: String, body: JSONObject? = null, token: String? = null): JSONObject =
         exec(SITE + path, method, body, token, false)
-
-    /** Sends a chat attachment (with optional text) to the website's own message endpoint. */
-    fun siteUpload(path: String, field: String, file: java.io.File, mime: String, text: String, token: String?): JSONObject {
-        val boundary = "ls" + UUID.randomUUID().toString().replace("-", "")
-        val c = URL(SITE + path).openConnection() as HttpURLConnection
-        try {
-            c.requestMethod = "POST"
-            c.connectTimeout = 15000
-            c.readTimeout = 90000
-            c.doOutput = true
-            c.setChunkedStreamingMode(0)
-            c.setRequestProperty("Accept", "application/json")
-            c.setRequestProperty("User-Agent", "LandlordSpacesApp/" + BuildConfig.VERSION_NAME)
-            if (token != null) c.setRequestProperty("Authorization", "Bearer $token")
-            c.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            c.outputStream.use { o ->
-                o.write(("--$boundary\r\nContent-Disposition: form-data; name=\"body\"\r\n\r\n" + text + "\r\n").toByteArray())
-                o.write(("--$boundary\r\nContent-Disposition: form-data; name=\"" + field + "\"; filename=\"" + file.name + "\"\r\nContent-Type: " + mime + "\r\n\r\n").toByteArray())
-                file.inputStream().use { it.copyTo(o) }
-                o.write(("\r\n--$boundary--\r\n").toByteArray())
-            }
-            val status = c.responseCode
-            val stream = if (status in 200..299) c.inputStream else c.errorStream
-            val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
-            val json = try { JSONObject(body) } catch (e: Exception) { JSONObject() }
-            if (status !in 200..299) throw ApiError("http_$status", json.optString("message", "The file could not be sent."), status)
-            return json
-        } finally {
-            c.disconnect()
-        }
-    }
-
-    /** Sends one photo to the server as a multipart upload. */
-    fun upload(path: String, file: java.io.File, token: String?): JSONObject {
-        val boundary = "ls" + UUID.randomUUID().toString().replace("-", "")
-        val c = URL(BASE + path).openConnection() as HttpURLConnection
-        try {
-            c.requestMethod = "POST"
-            c.connectTimeout = 15000
-            c.readTimeout = 90000
-            c.doOutput = true
-            c.setChunkedStreamingMode(0)
-            c.setRequestProperty("Accept", "application/json")
-            c.setRequestProperty("User-Agent", "LandlordSpacesApp/" + BuildConfig.VERSION_NAME)
-            if (token != null) c.setRequestProperty("Authorization", "Bearer $token")
-            c.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            c.outputStream.use { o ->
-                o.write(("--$boundary\r\nContent-Disposition: form-data; name=\"photos\"; filename=\"" + file.name + "\"\r\nContent-Type: image/jpeg\r\n\r\n").toByteArray())
-                file.inputStream().use { it.copyTo(o) }
-                o.write(("\r\n--$boundary--\r\n").toByteArray())
-            }
-            val status = c.responseCode
-            val stream = if (status in 200..299) c.inputStream else c.errorStream
-            val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-            val json = try { JSONObject(text) } catch (e: Exception) { JSONObject() }
-            if (status !in 200..299 || !json.optBoolean("ok", false)) {
-                throw ApiError(json.optString("error", "http_$status"), json.optString("message", "Something went wrong. Please try again."), status)
-            }
-            return json
-        } finally {
-            c.disconnect()
-        }
-    }
 
     private fun exec(url: String, method: String, body: JSONObject?, token: String?, needOk: Boolean): JSONObject {
         val c = URL(url).openConnection() as HttpURLConnection
@@ -128,22 +57,7 @@ class Session(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("ls_session", Context.MODE_PRIVATE)
 
     private val cacheStore = context.applicationContext.getSharedPreferences("ls_cache", Context.MODE_PRIVATE)
-    /** True while a screen is showing the phone's saved copy because there is no connection. */
-    var offline by mutableStateOf(false)
-
-    fun cachePut(k: String, v: String) {
-        try {
-            val e = cacheStore.edit().putString(k, v)
-            if (k.startsWith("g:")) {
-                // Keep only the 40 most recent reads so the saved copies never grow without limit.
-                val idx = (cacheStore.getString("idx", "") ?: "").split("\n").filter { it.isNotEmpty() && it != k }.toMutableList()
-                idx.add(k)
-                while (idx.size > 40) e.remove(idx.removeAt(0))
-                e.putString("idx", idx.joinToString("\n"))
-            }
-            e.apply()
-        } catch (ex: Exception) { }
-    }
+    fun cachePut(k: String, v: String) { try { cacheStore.edit().putString(k, v).apply() } catch (e: Exception) { } }
     fun cacheGet(k: String): String? = cacheStore.getString(k, null)
     fun cacheClear() { cacheStore.edit().clear().apply() }
 
@@ -184,121 +98,45 @@ class Session(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().remove("access").remove("refresh").remove("name").remove("outbox").apply()
+        prefs.edit().remove("access").remove("refresh").remove("name").apply()
         cacheClear()
     }
 
-    /** Renews the access token once, even when several calls found it expired at the same moment. */
-    private fun renew(used: String?) {
-        synchronized(RENEW_LOCK) {
-            val current = access
-            if (current != null && current != used) return
-            val r = refresh ?: throw ApiError("unauthorized", "Please sign in again.", 401)
-            try {
-                save(Api.request("POST", "/auth/refresh", JSONObject().put("refresh_token", r)))
-            } catch (re: ApiError) {
-                if (re.status == 401 && refresh == r) clear()
-                throw re
-            }
-        }
-    }
-
-    private fun live(site: Boolean, method: String, path: String, body: JSONObject?): JSONObject {
-        val used = access
+    /** Call a signed-in endpoint; if the access token has expired, renew it once and retry. */
+    fun call(method: String, path: String, body: JSONObject? = null): JSONObject {
         try {
-            return if (site) Api.site(method, path, body, used) else Api.request(method, path, body, used)
+            return Api.request(method, path, body, access)
         } catch (e: ApiError) {
-            if (e.status == 401 && refresh != null) {
-                renew(used)
-                return if (site) Api.site(method, path, body, access) else Api.request(method, path, body, access)
-            }
-            throw e
-        }
-    }
-
-    /** Reads are remembered on the phone; with no connection the saved copy is shown instead. */
-    private fun withCopy(read: Boolean, key: String, fetch: () -> JSONObject): JSONObject {
-        if (!read) return fetch()
-        try {
-            val j = fetch()
-            val text = j.toString()
-            if (text.length < 400000) cachePut(key, text)
-            offline = false
-            return j
-        } catch (e: ApiError) {
-            throw e
-        } catch (e: java.io.IOException) {
-            val old = cacheGet(key) ?: throw e
-            offline = true
-            return JSONObject(old)
-        }
-    }
-
-    /** Call a signed-in endpoint; an expired access token is renewed once and the call retried. */
-    fun call(method: String, path: String, body: JSONObject? = null): JSONObject =
-        withCopy(method == "GET", "g:$path") { live(false, method, path, body) }
-
-    /** Uploads one photo; an expired access token is renewed once and the upload retried. */
-    fun upload(path: String, file: java.io.File): JSONObject {
-        val used = access
-        try {
-            return Api.upload(path, file, used)
-        } catch (e: ApiError) {
-            if (e.status == 401 && refresh != null) {
-                renew(used)
-                return Api.upload(path, file, access)
-            }
-            throw e
-        }
-    }
-
-    fun siteUpload(path: String, field: String, file: java.io.File, mime: String, text: String): JSONObject {
-        val used = access
-        try {
-            return Api.siteUpload(path, field, file, mime, text, used)
-        } catch (e: ApiError) {
-            if (e.status == 401 && refresh != null) {
-                renew(used)
-                return Api.siteUpload(path, field, file, mime, text, access)
+            val r = refresh
+            if (e.status == 401 && r != null) {
+                try {
+                    save(Api.request("POST", "/auth/refresh", JSONObject().put("refresh_token", r)))
+                } catch (re: ApiError) {
+                    if (re.status == 401) clear()
+                    throw re
+                }
+                return Api.request(method, path, body, access)
             }
             throw e
         }
     }
 
     /** Same as [call] but for the website's own JSON endpoints (favourites, enquiries, chat). */
-    fun callSite(method: String, path: String, body: JSONObject? = null): JSONObject = live(true, method, path, body)
-
-    /** Saves an action made while offline; it is sent, in order, when the connection returns. */
-    fun enqueue(method: String, path: String, body: JSONObject) {
-        synchronized(OUTBOX_LOCK) {
-            val arr = try { JSONArray(prefs.getString("outbox", "[]")) } catch (e: Exception) { JSONArray() }
-            arr.put(JSONObject().put("m", method).put("p", path).put("b", body))
-            prefs.edit().putString("outbox", arr.toString()).apply()
-        }
-    }
-
-    fun pending(): Int = try { JSONArray(prefs.getString("outbox", "[]")).length() } catch (e: Exception) { 0 }
-
-    /** Sends the actions saved while offline. Stops at the first one the network cannot carry yet. */
-    fun flush(): Int {
-        if (!signedIn()) return 0
-        return synchronized(OUTBOX_LOCK) {
-            val arr = try { JSONArray(prefs.getString("outbox", "[]")) } catch (e: Exception) { JSONArray() }
-            var sent = 0
-            while (arr.length() > 0) {
-                val a = arr.getJSONObject(0)
+    fun callSite(method: String, path: String, body: JSONObject? = null): JSONObject {
+        try {
+            return Api.site(method, path, body, access)
+        } catch (e: ApiError) {
+            val r = refresh
+            if (e.status == 401 && r != null) {
                 try {
-                    live(true, a.getString("m"), a.getString("p"), a.optJSONObject("b"))
-                } catch (e: ApiError) {
-                    if (e.status == 401 || e.status == 429 || e.status >= 500) break
-                } catch (e: java.io.IOException) {
-                    break
+                    save(Api.request("POST", "/auth/refresh", JSONObject().put("refresh_token", r)))
+                } catch (re: ApiError) {
+                    if (re.status == 401) clear()
+                    throw re
                 }
-                arr.remove(0)
-                sent++
-                prefs.edit().putString("outbox", arr.toString()).apply()
+                return Api.site(method, path, body, access)
             }
-            sent
+            throw e
         }
     }
 
@@ -309,8 +147,7 @@ class Session(context: Context) {
     }
 
     /** Marketplace reads work signed out too; when signed in the token adds the member's "saved" flags. */
-    fun open(method: String, path: String): JSONObject =
-        if (signedIn()) call(method, path) else withCopy(method == "GET", "g:$path") { Api.request(method, path, null, null) }
+    fun open(method: String, path: String): JSONObject = if (signedIn()) call(method, path) else Api.request(method, path, null, null)
 
     fun signOut() {
         try {

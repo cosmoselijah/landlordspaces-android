@@ -16,8 +16,8 @@ android {
         applicationId = "com.landlordspaces.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.7.0"
+        versionCode = 5
+        versionName = "1.3.1"
     }
 
     signingConfigs {

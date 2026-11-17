@@ -51,10 +51,10 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 @Composable
-fun OfflineBanner(modifier: Modifier = Modifier, waiting: Int = 0) {
+fun OfflineBanner(modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().background(Brand.Ink).padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.WifiOff, null, Modifier.size(14.dp), tint = Color.White)
-        Text("  You are offline. Showing saved results." + (if (waiting > 0) " $waiting change(s) will send when you are back online." else ""), color = Color.White, fontSize = 12.sp)
+        Text("  You are offline. Showing saved results.", color = Color.White, fontSize = 12.sp)
     }
 }
 

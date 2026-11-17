@@ -10,21 +10,14 @@ import android.provider.MediaStore
 import android.webkit.GeolocationPermissions
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,10 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -55,8 +45,6 @@ fun WebPage(session: Session, path: String, modifier: Modifier, onTitle: (String
     val context = LocalContext.current
     var token by remember(path) { mutableStateOf<String?>(null) }
     var error by remember(path) { mutableStateOf("") }
-    var attempt by remember(path) { mutableStateOf(0) }
-    var webOffline by remember(path) { mutableStateOf(false) }
     var webView by remember(path) { mutableStateOf<WebView?>(null) }
     var canBack by remember(path) { mutableStateOf(false) }
     var progress by remember(path) { mutableStateOf(0) }
@@ -82,7 +70,7 @@ fun WebPage(session: Session, path: String, modifier: Modifier, onTitle: (String
         if (g != null) g.second.invoke(g.first, grants.values.any { it }, false)
     }
 
-    LaunchedEffect(path, attempt) {
+    LaunchedEffect(path) {
         online { session.freshAccess() }
             .onSuccess { token = it }
             .onFailure { error = friendly(it) }
@@ -157,12 +145,6 @@ fun WebPage(session: Session, path: String, modifier: Modifier, onTitle: (String
                     }
                 }
                 webViewClient = object : WebViewClient() {
-                    override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
-                        webOffline = false
-                    }
-                    override fun onReceivedError(view: WebView, request: WebResourceRequest, err: WebResourceError) {
-                        if (request.isForMainFrame) webOffline = true
-                    }
                     override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
                         canBack = view.canGoBack()
                     }
@@ -184,15 +166,6 @@ fun WebPage(session: Session, path: String, modifier: Modifier, onTitle: (String
             }
         }
     )
-    if (webOffline) {
-        Column(Modifier.fillMaxSize().background(Color.White).padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("You are offline", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            Spacer(Modifier.height(8.dp))
-            Text("This page needs a connection. Your saved homes, messages and recent searches are still available from the menu below.", textAlign = TextAlign.Center, color = Brand.Muted)
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = { webOffline = false; token = null; error = ""; attempt++ }) { Text("Try again") }
-        }
-    }
     if (progress in 1..99) androidx.compose.material3.LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth(), color = Brand.Primary, trackColor = Color.Transparent)
     }
 }
