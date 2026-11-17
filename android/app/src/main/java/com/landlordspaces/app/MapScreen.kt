@@ -238,7 +238,7 @@ private fun locate(ctx: Context, done: (Fix) -> Unit) {
         val last = best
         if (last != null && System.currentTimeMillis() - last.time < 120000) { done(Fix(Pair(last.latitude, last.longitude), "")); return }
         LocationManagerCompat.getCurrentLocation(
-            lm, providers.last(), null, ContextCompat.getMainExecutor(ctx),
+            lm, providers.last(), null as androidx.core.os.CancellationSignal?, ContextCompat.getMainExecutor(ctx),
             androidx.core.util.Consumer<Location?> { loc ->
                 if (loc != null) done(Fix(Pair(loc.latitude, loc.longitude), ""))
                 else if (last != null) done(Fix(Pair(last.latitude, last.longitude), ""))

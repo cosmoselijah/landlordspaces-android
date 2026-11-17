@@ -350,12 +350,4 @@ class Session(context: Context) {
     fun open(method: String, path: String): JSONObject =
         if (signedIn()) call(method, path) else withCopy(method == "GET", "g:$path") { Api.request(method, path, null, null) }
 
-    fun signOut() {
-        try {
-            call("POST", "/auth/logout", JSONObject().put("device_id", deviceId))
-        } catch (e: Exception) {
-            // Signing out on this phone always works, even offline.
-        }
-        clear()
-    }
 }
