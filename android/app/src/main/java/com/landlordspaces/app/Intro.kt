@@ -41,7 +41,13 @@ import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.delay
 
 /** Remembers that the opening film has already played in this process, so rotating the phone or returning from recents never replays it. */
-object Launch { var played = false }
+object Launch {
+    var played = false
+    /** True once the person has signed in during this run of the app. */
+    var signedIn = false
+    /** A short message for the sign-in screen, such as "Your session has ended". */
+    var notice = ""
+}
 
 /** People who turned animations off in Android's settings get no film. */
 fun reducedMotion(context: android.content.Context): Boolean = try {

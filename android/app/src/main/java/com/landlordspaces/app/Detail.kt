@@ -2,6 +2,8 @@ package com.landlordspaces.app
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,7 +94,7 @@ private fun Row2(label: String, value: String) {
 @Composable
 fun DetailScreen(
     repo: Repo, key: String, onBack: () -> Unit, openListing: (Int) -> Unit, openChat: (Int) -> Unit, openWeb: (String, String) -> Unit,
-    inCompare: Boolean = false, onCompare: (Listing) -> Unit = {},
+    inCompare: Boolean = false, onCompare: (Listing) -> Unit = {}, openMap: (MapTarget, Boolean) -> Unit = { _, _ -> },
 ) {
     val id = key
     StatusBar(darkBackground = true)
@@ -201,38 +203,33 @@ fun DetailScreen(
                             }
                             else -> Column {
                                 val place = x.address.ifEmpty { x.base.area }
-                                val la = x.base.lat; val ln = x.base.lng
-                                val hasPin = la != null && ln != null && !(la == 0.0 && ln == 0.0)
-                                Text(place, fontWeight = FontWeight.SemiBold)
-                                if (hasPin) {
-                                    val d = 0.004
-                                    val mapUrl = "https://www.openstreetmap.org/export/embed.html?bbox=" + (ln!! - d * 1.5) + "," + (la!! - d) + "," + (ln + d * 1.5) + "," + (la + d) + "&layer=mapnik&marker=" + la + "," + ln
-                                    androidx.compose.ui.viewinterop.AndroidView(
-                                        modifier = Modifier.fillMaxWidth().height(260.dp).padding(top = 12.dp).clip(RoundedCornerShape(16.dp)),
-                                        factory = { ctx ->
-                                            android.webkit.WebView(ctx).apply {
-                                                settings.javaScriptEnabled = true
-                                                settings.domStorageEnabled = true
-                                                setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
-                                                webViewClient = android.webkit.WebViewClient()
-                                                loadUrl(mapUrl)
-                                            }
-                                        },
-                                    )
-                                }
-                                val dest = if (hasPin) "$la,$ln" else Uri.encode(place)
-                                PrimaryButton("Get directions", {
-                                    try {
-                                        val i = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=" + dest)).setPackage("com.google.android.apps.maps")
-                                        context.startActivity(i)
-                                    } catch (e: Exception) {
-                                        openInBrowser(context, "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" + dest)
+                                val target = MapTarget(x.base.title, place, x.base.area, x.base.cover, x.base.lat, x.base.lng)
+                                val pin = target.pin
+                                Surface(
+                                    onClick = { openMap(target, false) }, shape = RoundedCornerShape(14.dp), color = Color.White,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Brand.Line), modifier = Modifier.fillMaxWidth().height(64.dp),
+                                ) {
+                                    Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Outlined.LocationOn, null, tint = Brand.Primary, modifier = Modifier.size(24.dp))
+                                        Column(Modifier.weight(1f).padding(start = 12.dp), verticalArrangement = Arrangement.Center) {
+                                            Text(place, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                            Text("View on Map", fontSize = 12.sp, color = Brand.Primary)
+                                        }
+                                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Brand.Muted)
                                     }
-                                }, Modifier.fillMaxWidth().padding(top = 12.dp), icon = Icons.Outlined.Directions)
-                                OutlineButton("Open in Maps", {
-                                    val geo = if (hasPin) "geo:$la,$ln?q=$la,$ln(" + Uri.encode(x.base.title) + ")" else "geo:0,0?q=" + Uri.encode(place)
-                                    try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(geo))) } catch (e: Exception) { openInBrowser(context, "https://www.google.com/maps/search/?api=1&query=" + dest) }
-                                }, Modifier.fillMaxWidth().padding(top = 8.dp))
+                                }
+                                Box(Modifier.fillMaxWidth().padding(top = 12.dp).height(180.dp).clip(RoundedCornerShape(16.dp)).background(Brand.MintSoft)) {
+                                    if (pin != null) {
+                                        LeafletMap(pin.first, pin.second, false, Modifier.fillMaxSize())
+                                        Box(Modifier.fillMaxSize().clickable { openMap(target, false) })
+                                    } else {
+                                        Box(Modifier.fillMaxSize().clickable { openMap(target, false) }, contentAlignment = Alignment.Center) {
+                                            Text("Tap to find this address on the map", color = Brand.Primary, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
+                                PrimaryButton("Get Directions", { openMap(target, true) }, Modifier.fillMaxWidth().padding(top = 12.dp), icon = Icons.Outlined.Directions)
+                                OutlineButton("Open in Maps", { openInMaps(context, pin, place, x.base.title) }, Modifier.fillMaxWidth().padding(top = 8.dp))
                             }
                         }
                         if (x.similar.isNotEmpty()) {

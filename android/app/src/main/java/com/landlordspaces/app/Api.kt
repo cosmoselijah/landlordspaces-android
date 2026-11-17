@@ -147,13 +147,41 @@ class Session(context: Context) {
     fun cacheGet(k: String): String? = cacheStore.getString(k, null)
     fun cacheClear() { cacheStore.edit().clear().apply() }
 
+    // Tokens are encrypted with an Android Keystore key before they touch the disk; a copy lives in memory while the app runs.
+    private var memAccess: String? = null
+    private var memRefresh: String? = null
+
+    private fun readSecret(k: String): String? {
+        val v = prefs.getString(k, null) ?: return null
+        return if (v.startsWith("e1:")) SecureStore.decrypt(v) else v
+    }
+
+    private fun writeSecret(k: String, v: String?) {
+        val e = prefs.edit()
+        if (v == null) e.remove(k) else {
+            val enc = SecureStore.encrypt(v)
+            if (enc != null) e.putString(k, enc) else e.remove(k)
+        }
+        e.apply()
+    }
+
     var access: String?
-        get() = prefs.getString("access", null)
-        set(v) { prefs.edit().putString("access", v).apply() }
+        get() = memAccess ?: readSecret("access").also { memAccess = it }
+        set(v) { memAccess = v; writeSecret("access", v) }
 
     var refresh: String?
-        get() = prefs.getString("refresh", null)
-        set(v) { prefs.edit().putString("refresh", v).apply() }
+        get() = memRefresh ?: readSecret("refresh").also { memRefresh = it }
+        set(v) { memRefresh = v; writeSecret("refresh", v) }
+
+    /** "Keep me signed in": when off, the sign-in ends the next time the app is started from scratch. */
+    var keep: Boolean
+        get() = prefs.getBoolean("keep", true)
+        set(v) { prefs.edit().putBoolean("keep", v).apply() }
+
+    /** Fingerprint unlock is on for the saved sign-in. */
+    var bio: Boolean
+        get() = prefs.getBoolean("bio", false)
+        set(v) { prefs.edit().putBoolean("bio", v).apply() }
 
     var name: String
         get() = prefs.getString("name", "") ?: ""
@@ -184,8 +212,18 @@ class Session(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().remove("access").remove("refresh").remove("name").remove("outbox").apply()
+        memAccess = null
+        memRefresh = null
+        prefs.edit().remove("access").remove("refresh").remove("name").remove("outbox").remove("bio").apply()
         cacheClear()
+    }
+
+    /** Signing out: the server is told to end this session (best effort), then everything saved on the phone is removed. */
+    fun signOut() {
+        val a = access
+        val dev = deviceId
+        if (a != null) Thread { try { Api.request("POST", "/auth/logout", JSONObject().put("device_id", dev), a) } catch (e: Exception) { } }.start()
+        clear()
     }
 
     /** Renews the access token once, even when several calls found it expired at the same moment. */

@@ -58,7 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-class MainActivity : ComponentActivity() {
+class MainActivity : androidx.fragment.app.FragmentActivity() {
     /** A link tapped outside the app (a property page on the website) waits here until the shell can open it. */
     private val pendingLink = mutableStateOf<String?>(null)
 
@@ -86,13 +86,20 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun App(session: Session, link: MutableState<String?>) {
     val context = LocalContext.current
-    var phase by remember { mutableStateOf(if (session.signedIn()) "main" else "intro") }
+    // A sign-in that was not marked "Keep me signed in" ends when the app is started again from scratch.
+    remember {
+        if (session.signedIn() && !session.keep && !Launch.signedIn) session.clear()
+        0
+    }
+    var phase by remember {
+        mutableStateOf(if (session.signedIn()) (if (session.bio && !Launch.signedIn && Bio.available(context)) "bio" else "main") else "intro")
+    }
     var film by remember { mutableStateOf(!Launch.played && !reducedMotion(context)) }
     // If the server ends this session for good (password changed, signed out elsewhere), return to the sign-in screen.
     LaunchedEffect(phase) {
         while (phase == "main") {
             delay(3000)
-            if (!session.signedIn()) phase = "auth"
+            if (!session.signedIn()) { Launch.signedIn = false; Launch.notice = "Your session has ended. Please sign in again."; phase = "auth" }
         }
     }
     // Warm the first screen's data while the opening film plays, so the app is ready the moment it ends.
@@ -100,8 +107,9 @@ fun App(session: Session, link: MutableState<String?>) {
     Box(Modifier.fillMaxSize()) {
         when (phase) {
             "intro" -> Onboarding { phase = "auth" }
-            "auth" -> AuthScreen(session, startRegister = false, onDone = { phase = "main" }, onBack = { phase = "intro" })
-            else -> MainShell(session, link) { Drafts.clearAll(context); phase = "auth" }
+            "bio" -> BiometricGate(onUnlocked = { Launch.signedIn = true; phase = "main" }, onPassword = { phase = "auth" })
+            "auth" -> AuthScreen(session, startRegister = false, onDone = { Launch.signedIn = true; Launch.notice = ""; phase = "main" }, onBack = { phase = "intro" }, notice = Launch.notice)
+            else -> MainShell(session, link) { Drafts.clearAll(context); Launch.signedIn = false; Launch.notice = ""; phase = "auth" }
         }
         if (film) IntroFilm { film = false; Launch.played = true }
     }
@@ -137,6 +145,7 @@ data object ProfileRoute : Screen
 data object SecurityRoute : Screen
 data object HelpRoute : Screen
 data object AiRoute : Screen
+data class MapRoute(val target: MapTarget, val auto: Boolean) : Screen
 
 /** One bottom bar (Home, Browse, List, Messages, Account) over the tab screens; details open on top of it. */
 @Composable
@@ -219,7 +228,7 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
                 1 -> BrowseScreen(repo, bMarket, bCat, bQuery, openListing, openWeb, { push(ChatRoute(it)) }, { push(NotificationsRoute) })
                 2 -> ListScreen(session, repo, openWeb, { tab = 0 }, { push(NotificationsRoute) }, { push(AiRoute) }, { stack.clear(); tab = 4 }, { push(WorkspaceRoute) })
                 3 -> MessagesScreen(repo, { push(ChatRoute(it)) }, openListing, { stack.clear(); tab = 1 }, { push(WorkspaceRoute) }, { push(AiRoute) }, { push(NotificationsRoute) }, { stack.clear(); tab = 4 })
-                else -> AccountScreen(repo, openWeb, { push(SavedRoute) }, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(AiRoute) }, { session.clear(); Alerts.stop(context); onSignedOut() })
+                else -> AccountScreen(repo, openWeb, { push(SavedRoute) }, { push(NotificationsRoute) }, { push(WorkspaceRoute) }, { push(AiRoute) }, { session.signOut(); Alerts.stop(context); onSignedOut() })
             }
             }
             }
@@ -231,7 +240,7 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
     stack.forEachIndexed { i, s ->
         Box(Modifier.fillMaxSize().background(Brand.Bg).pointerInput(Unit) { detectTapGestures { } }) {
             when (s) {
-                is ListingScreen -> DetailScreen(repo, s.key, { pop() }, openListing, { push(ChatRoute(it)) }, openWeb, compare.any { c -> c.id.toString() == s.key || c.id == (s.key.toIntOrNull() ?: -1) }, toggleCompare)
+                is ListingScreen -> DetailScreen(repo, s.key, { pop() }, openListing, { push(ChatRoute(it)) }, openWeb, compare.any { c -> c.id.toString() == s.key || c.id == (s.key.toIntOrNull() ?: -1) }, toggleCompare, { tg, auto -> push(MapRoute(tg, auto)) })
                 is ChatRoute -> ChatScreen(repo, s.id, { pop() }, openListing)
                 is WebRoute -> Column(Modifier.fillMaxSize()) {
                     StatusBar(darkBackground = false)
@@ -248,6 +257,7 @@ fun MainShell(session: Session, link: MutableState<String?>, onSignedOut: () -> 
                 SecurityRoute -> SecurityScreen(repo, { pop() }, { t, p -> push(WebRoute(t, p)) }, { Alerts.stop(context); onSignedOut() })
                 HelpRoute -> HelpScreen(repo, { pop() }, { t, p -> push(WebRoute(t, p)) }, { push(AiRoute) })
                 AiRoute -> AiScreen(repo, { pop() }, openWeb, openListing)
+                is MapRoute -> MapScreen(s.target, s.auto, { pop() })
             }
         }
     }
